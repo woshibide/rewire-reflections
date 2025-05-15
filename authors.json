@@ -1,0 +1,36 @@
+{
+    "articles": [
+        {
+            "author": "Estelle Bolon",
+            "title": "Through the Photographer's Frame: Capturing Consonance with Alicia Karsonopero",
+            "description": "An in-depth interview exploring visual storytelling.",
+            "year": "2025",
+            "theme": "another-thing",
+            "type": "interview"
+        },
+        {
+            "author": "Fred Waine",
+            "title": "On Creolisation: a Conversation with Isaiah Hull",
+            "description": "A dialogue on cultural fusion and identity.",
+            "year": "2025",
+            "theme": "another-thing",
+            "type": "interview"
+        },
+        {
+            "author": "Eva Vanderstricht",
+            "title": "try. do. good.",
+            "description": "Good Sad Happy Bad navigating through",
+            "year": "2025",
+            "theme": "something",
+            "type": "essay"
+        },
+        {
+            "author": "Jung Hoon Ra",
+            "title": "When music breathes, what kind of future does it leave behind?",
+            "description": "An exploration of sonic legacies.",
+            "year": "2025",
+            "theme": "some-other-topic", 
+            "type": "poem"
+        }
+    ]
+}
