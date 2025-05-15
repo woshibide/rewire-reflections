@@ -19,6 +19,40 @@ async function loadArticles() {
         // setup filter functionality
         setupFilters(data.articles);
         
+        // add event listener for author clicks from three.js scene
+        document.addEventListener('authorClick', (event) => {
+            // when an author is clicked in the 3d scene, filter the articles
+            const clickedAuthor = event.detail.author;
+            filterArticlesByAuthor(clickedAuthor, data.articles);
+        });
+        
+        // add event listener to header h1 element to center the canvas camera when clicked
+        const headerTitle = document.querySelector('header h1');
+        if (headerTitle) {
+            headerTitle.addEventListener('click', () => {
+                // center the camera on the canvas
+                if (window.centerCamera) {
+                    window.centerCamera();
+                    
+                    // provide visual feedback in the DOM as well
+                    const feedbackEl = document.createElement('div');
+                    feedbackEl.className = 'center-feedback';
+                    feedbackEl.textContent = 'View centered';
+                    document.body.appendChild(feedbackEl);
+                    
+                    // animate and remove the feedback element
+                    setTimeout(() => {
+                        feedbackEl.style.opacity = '0';
+                        setTimeout(() => feedbackEl.remove(), 500);
+                    }, 1500);
+                }
+            });
+            
+            // add cursor style and tooltip to indicate the element is clickable
+            headerTitle.style.cursor = 'pointer';
+            headerTitle.setAttribute('title', 'Click to center view');
+        }
+        
     } catch (error) {
         console.error('error loading authors data:', error);
     }
@@ -92,5 +126,17 @@ function applyFilters(allArticles) {
     renderArticles(filteredArticles);
 }
 
+// function to filter articles by author
+function filterArticlesByAuthor(author, allArticles) {
+    // filter the articles to only show the clicked author's work
+    const filteredArticles = allArticles.filter(article => article.author === author);
+    
+    // update the display
+    renderArticles(filteredArticles);
+    
+    // update any UI to show we're filtering (you could add this later)
+    console.log(`filtering articles by author: ${author}`);
+}
+
 // initialize on document load
-document.addEventListener('DOMContentLoaded', loadArticles); 
+document.addEventListener('DOMContentLoaded', loadArticles);
