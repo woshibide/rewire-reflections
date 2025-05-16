@@ -1,1 +1,119 @@
-/* this is not meant to go into production */
+/* debug debug debug */
+
+/* styles for trigger area visualizers */
+.trigger-area-visualizer-base {
+    position: fixed;
+    /* left, top, width, height are set dynamically in js */
+    background: rgba(255, 0, 0, 0.5);
+    border: 1px dashed red;
+    z-index: 9999;
+    pointer-events: none;
+}
+
+.trigger-area-label {
+    position: absolute; /* specific positioning (top, left, etc.) in js */
+    color: red;
+    font-size: 12px;
+    font-family: monospace;
+}
+
+/* styles for author region visualizer */
+.author-region-visualizer-base {
+    position: absolute;
+    /* dynamic position/size updates in js */
+    border: 2px dashed blue;
+    background: rgba(0, 0, 255, 0.1);
+    z-index: 9998;
+    pointer-events: none;
+}
+
+.author-region-label {
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    color: blue;
+    font-size: 12px;
+    font-family: monospace;
+    background-color: rgba(255, 255, 255, 0.7);
+    padding: 2px 4px;
+    border-radius: 2px;
+}
+
+/* styles for pan boundary visualizer */
+.pan-boundary-visualizer-base {
+    position: absolute;
+    /* dynamic position/size updates in js */
+    border: 2px dashed green;
+    background: rgba(0, 255, 0, 0.05);
+    z-index: 9997;
+    pointer-events: none;
+}
+
+.pan-boundary-label {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    color: green;
+    font-size: 12px;
+    font-family: monospace;
+    background-color: rgba(255, 255, 255, 0.7);
+    padding: 2px 4px;
+    border-radius: 2px;
+}
+
+/* styles for panning debug controls */
+.panning-controls-container {
+    position: fixed;
+    bottom: 10px;
+    right: 10px;
+    background: rgba(0,0,0,0.6);
+    padding: 10px;
+    border-radius: 5px;
+    color: white;
+    font-family: monospace;
+    z-index: 10000;
+    max-width: 250px;
+}
+
+.panning-controls-title {
+    margin-bottom: 8px;
+    font-size: 12px;
+}
+
+.panning-controls-label {
+    display: block;
+    font-size: 10px;
+    /* margin-bottom is set in js where needed (e.g., 5px for labels before inputs) */
+    /* margin-top is set in js where needed */
+}
+
+.panning-controls-slider {
+    width: 100%;
+}
+
+.panning-controls-region-header {
+    margin-top: 15px;
+    margin-bottom: 5px;
+    font-size: 12px;
+}
+
+.panning-controls-reset-button {
+    display: block;
+    margin-top: 15px;
+    padding: 5px;
+    width: 100%;
+    cursor: pointer;
+    background-color: #3a3a3a;
+    color: white;
+    border: 1px solid #555;
+    text-align: center;
+    border-radius: 3px;
+}
+.panning-controls-reset-button:hover {
+    background-color: #4a4a4a;
+}
+
+.panning-controls-checkbox-text {
+    vertical-align: middle;
+    margin-left: 4px;
+}

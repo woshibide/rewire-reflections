@@ -34,7 +34,7 @@ async function loadArticles() {
                 if (window.centerCamera) {
                     window.centerCamera();
                     
-                    // provide visual feedback in the DOM as well
+                    // provide visual feedback in the dom as well
                     const feedbackEl = document.createElement('div');
                     feedbackEl.className = 'center-feedback';
                     feedbackEl.textContent = 'View centered';
@@ -70,12 +70,15 @@ function renderArticles(articles) {
         articleElement.dataset.theme = article.theme;
         articleElement.dataset.type = article.type;
         
+        // build the article html, including the text if present
         articleElement.innerHTML = `
             <div class="author">${article.author}</div>
             <div class="title">${article.title}</div>
             <div class="description">${article.description}</div>
+            ${article.text ? `<div class="article-text">${article.text.replace(/\n/g, '<br>')}</div>` : ''}
         `;
         
+        // append the article element to the container
         container.appendChild(articleElement);
     });
 }
@@ -88,12 +91,19 @@ function setupFilters(allArticles) {
         link.addEventListener('click', (e) => {
             e.preventDefault();
             
-            // update active class
             const filterType = link.dataset.filter;
-            document.querySelectorAll(`.filter-section a[data-filter="${filterType}"]`).forEach(el => {
-                el.classList.remove('active');
-            });
-            link.classList.add('active');
+            
+            // if the clicked link is already active, deactivate it
+            if (link.classList.contains('active')) {
+                link.classList.remove('active');
+            } else {
+                // deactivate other active links in the same filter group
+                document.querySelectorAll(`.filter-section a[data-filter="${filterType}"]`).forEach(el => {
+                    el.classList.remove('active');
+                });
+                // activate the clicked link
+                link.classList.add('active');
+            }
             
             // apply filters
             applyFilters(allArticles);
@@ -109,13 +119,14 @@ function applyFilters(allArticles) {
     document.querySelectorAll('.filter-section a.active').forEach(link => {
         const filterType = link.dataset.filter;
         const filterValue = link.dataset.value;
-        activeFilters[filterType] = filterValue;
+        activeFilters[filterType] = filterValue.toLowerCase(); // store filter value in lowercase
     });
     
     // filter articles
     const filteredArticles = allArticles.filter(article => {
         for (const [filterType, filterValue] of Object.entries(activeFilters)) {
-            if (article[filterType] !== filterValue) {
+            // ensure article property exists and compare in lowercase
+            if (!article[filterType] || article[filterType].toLowerCase() !== filterValue) {
                 return false;
             }
         }
@@ -134,7 +145,7 @@ function filterArticlesByAuthor(author, allArticles) {
     // update the display
     renderArticles(filteredArticles);
     
-    // update any UI to show we're filtering (you could add this later)
+    // update any ui to show we're filtering (you could add this later)
     console.log(`filtering articles by author: ${author}`);
 }
 

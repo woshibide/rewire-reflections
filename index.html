@@ -4,10 +4,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rewire Reflections Archive</title>
-    <link rel="stylesheet" href="styles.css">
-    <!-- three.js library -->
+    <title>Rewire Reflections</title>
+
+    <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" href="./debugging.css">
+    <!-- three.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- normalize -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
 </head>
 
 <body>
@@ -15,17 +19,17 @@
 
     <div class="container">
         <header>
-            <h1>Rewire<br>Reflections<br>Archive</h1>
+            <h1>Rewire<br>Reflections</h1>
+        
 
-
-            <div class="filters">
-                <div class="filter-section">
-                    <h2>Year</h2>
-                    <ul>
-                        <li><a href="#" data-filter="year" data-value="2024">2024</a></li>
-                        <li><a href="#" data-filter="year" data-value="2025" class="active">2025</a></li>
-                    </ul>
-                </div>
+        <div class="filters">
+            <div class="filter-section">
+                <h2>Year</h2>
+                <ul>
+                    <li><a href="#" data-filter="year" data-value="2024">2024</a></li>
+                    <li><a href="#" data-filter="year" data-value="2025" class="active">2025</a></li>
+                </ul>
+            </div>
 
                 <div class="filter-section">
                     <h2>Theme</h2>
@@ -40,22 +44,20 @@
                 <div class="filter-section">
                     <h2>Type</h2>
                     <ul>
-                        <li><a href="#" data-filter="type" data-value="interview" class="active">Interview</a></li>
-                        <li><a href="#" data-filter="type" data-value="essay">Essay</a></li>
-                        <li><a href="#" data-filter="type" data-value="poem">Poem</a></li>
+                        <li><a href="#" data-filter="type" data-value="Interview" class="active">Interview</a></li>
+                        <li><a href="#" data-filter="type" data-value="Essay">Essay</a></li>
+                        <li><a href="#" data-filter="type" data-value="Poem">Poem</a></li>
                     </ul>
                 </div>
             </div>
         </header>
-
         <div class="articles-container" id="articles-container">
             <!-- Articles will be loaded here from authors.json -->
-        </div>
     </div>
 
-    <script src="three-scene.js"></script>
-    <script src="debugging.js"></script>
-    <script src="scripts.js"></script>
+    <script src="./three-scene.js"></script>
+    <script src="./debugging.js"></script>
+    <script src="./scripts.js"></script>
 </body>
 
 </html>

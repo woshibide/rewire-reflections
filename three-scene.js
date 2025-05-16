@@ -1,4 +1,4 @@
-let DEVELOPMENT = false;             // for debugging
+let DEVELOPMENT = true;
 
 // global variables
 let scene, camera, renderer;
@@ -11,7 +11,7 @@ let targetX = 0, targetY = 0;
 // color palette for easy customization of the 3d canvas
 const COLORS = {
     // ui colors
-    primary: 0x4287f5,         // blue - used for author boxes normal state
+    primary: 0xBFF205,         // blue - used for author boxes normal state
     secondary: 0x42f5b3,       // teal - used for author boxes hover state
     
     // background and grid colors
@@ -32,12 +32,12 @@ const COLORS = {
 const CENTER_X = 0;
 const CENTER_Y = 0;
 
-const moveSpeed = 0.05;             // panning sensitivity
+const moveSpeed = 0.15;             // panning sensitivity
 const edgeTriggerSize = 20;         // size in pixels of the edge trigger area for panning
 let isPanning = false;              // if we're currently panning
 let panDirection = { x: 0, y: 0 };  // direction of panning
 let panSpeed = 0;                   // current panning speed
-const maxPanSpeed = 0.1;            // maximum panning speed
+const maxPanSpeed = 0.15;            // maximum panning speed
 
 // mouse drag panning variables
 let isDragging = false;             // if we're currently dragging the scene
@@ -47,10 +47,34 @@ let dragSensitivity = 0.01;         // how sensitive the drag panning is
 // pinch-to-zoom variables
 let initialPinchDistance = 0;       // initial distance between two touch points
 let currentScale = 1;               // current zoom scale
-let targetScale = 1;                // target zoom scale
-let zoomSpeed = 0.1;                // how fast to zoom
-let minScale = 0.5;                 // minimum zoom level
-let maxScale = 3;                   // maximum zoom level
+let targetScale = 1;                // target zoom scale - will be repurposed for perspective zoom if needed
+let zoomSpeed = 0.5;                // how fast to zoom
+let minScale = 0.5;                 // minimum zoom level - will be repurposed
+let maxScale = 3;                   // maximum zoom level - will be repurposed
+
+// epic shot view state
+let isEpicShotViewActive = false;
+// default camera perspective settings
+const defaultFOV = 40;
+const defaultCameraPosition = new THREE.Vector3(0, 0, 10); // z higher for a more top-down feel
+const defaultLookAt = new THREE.Vector3(0, 0, 0);
+
+// epic shot camera settings
+const epicShotFOV = 120;
+const epicShotOffset = new THREE.Vector3(0, -1.2, 0); // X, Y, Z
+
+// animation parameters
+let animationParams = {
+    active: false,
+    startTime: 0,
+    duration: 900, // slightly longer for smoother feel
+    sourcePos: new THREE.Vector3(),
+    targetPos: new THREE.Vector3(),
+    sourceLookAt: new THREE.Vector3(),
+    targetLookAt: new THREE.Vector3(),
+    sourceFov: defaultFOV,
+    targetFov: defaultFOV
+};
 
 // region panning boundaries
 let panBoundaries = {
@@ -65,180 +89,117 @@ let updateRegionVisualizer = null;  // function to update author region visualiz
 
 // function to center the camera on the canvas
 function centerCamera() {
-    // store original values for animation
-    const originalX = camera.position.x;
-    const originalY = camera.position.y;
-    const originalScale = targetScale;
-    
-    // set target position to center coordinates
-    targetX = CENTER_X;
-    targetY = CENTER_Y;
-    
-    // reset zoom to default with animation
-    const targetZoom = 1;
-    
-    // animate the transition to center
-    const startTime = Date.now();
-    const duration = 800; // milliseconds for the animation
-    
-    function animateToCenter() {
-        const elapsedTime = Date.now() - startTime;
-        const progress = Math.min(elapsedTime / duration, 1);
-        
-        // use easeOutCubic easing function for smooth animation
-        const easeProgress = 1 - Math.pow(1 - progress, 3);
-        
-        // smoothly interpolate camera position
-        camera.position.x = originalX + (CENTER_X - originalX) * easeProgress;
-        camera.position.y = originalY + (CENTER_Y - originalY) * easeProgress;
-        
-        // smoothly interpolate zoom
-        targetScale = originalScale + (targetZoom - originalScale) * easeProgress;
-        
-        // continue animation until complete
-        if (progress < 1) {
-            requestAnimationFrame(animateToCenter);
-        } else {
-            // ensure final position is exact
-            camera.position.x = CENTER_X;
-            camera.position.y = CENTER_Y;
-            targetScale = targetZoom;
-        }
-    }
-    
-    // start the animation
-    animateToCenter();
-    
-    // visual feedback when centering
-    // showCenteringFeedback();
-    
-    // log camera position (using lowercase for comments as per instruction)
-    console.log("camera centered to position:", CENTER_X, CENTER_Y);
-}
+    isEpicShotViewActive = false; // ensure we are exiting epic shot mode
 
-// add visual feedback when the camera is centered
-function showCenteringFeedback() {
-    // create a circular pulse effect at the center of the scene
-    const geometry = new THREE.RingGeometry(0.1, 0.2, 32);
-    const material = new THREE.MeshBasicMaterial({ 
-        color: 0x4287f5,
-        transparent: true,
-        opacity: 0.1,
-        side: THREE.DoubleSide
-    });
-    
-    const ring = new THREE.Mesh(geometry, material);
-    ring.position.z = 0.5; // position slightly above the grid
-    scene.add(ring);
-    
-    // animate the ring outward and fade it
-    const startTime = Date.now();
-    const duration = 1000; // 1 second animation
-    
-    function animatePulse() {
-        const elapsedTime = Date.now() - startTime;
-        const progress = Math.min(elapsedTime / duration, 1);
-        
-        // grow the ring
-        const scale = 1 + progress * 5;
-        ring.scale.set(scale, scale, 1);
-        
-        // fade out the ring
-        ring.material.opacity = 0.7 * (1 - progress);
-        
-        // update the scene
-        if (progress < 1) {
-            requestAnimationFrame(animatePulse);
-        } else {
-            // remove the ring from the scene when animation completes
-            scene.remove(ring);
-        }
-    }
-    
-    // start the animation
-    animatePulse();
+    animationParams.active = true;
+    animationParams.startTime = Date.now();
+    animationParams.sourcePos.copy(camera.position);
+    // calculate current lookat point based on camera's current direction
+    const currentDirection = camera.getWorldDirection(new THREE.Vector3());
+    animationParams.sourceLookAt.copy(camera.position).add(currentDirection.multiplyScalar(camera.position.distanceTo(animationParams.targetLookAt))); // estimate current lookat
+    animationParams.sourceFov = camera.fov;
+
+    // target default top-down perspective view
+    // if we want to return to a panned xy, use targetx, targety
+    animationParams.targetPos.set(targetX, targetY, defaultCameraPosition.z);
+    animationParams.targetLookAt.set(targetX, targetY, 0); // look at the panned xy on the z=0 plane
+    animationParams.targetFov = defaultFOV;
+
+    // log camera position (using lowercase for comments as per instruction)
+    console.log("camera centering to position:", animationParams.targetPos, "looking at:", animationParams.targetLookAt);
 }
 
 // initialize the three.js scene
 function initThreeJS() {
     // create scene
     scene = new THREE.Scene();
-    
-    // create camera (orthographic for top-down view)
-    const aspectRatio = window.innerWidth / window.innerHeight;
-    const cameraWidth = 10;
-    const cameraHeight = cameraWidth / aspectRatio;
-    camera = new THREE.OrthographicCamera(
-        -cameraWidth / 2, cameraWidth / 2,
-        cameraHeight / 2, -cameraHeight / 2,
-        0.1, 1000
-    );
 
-    camera.position.z = 5;
-    
+    // create camera (always perspective)
+    const aspectRatio = window.innerWidth / window.innerHeight;
+    camera = new THREE.PerspectiveCamera(defaultFOV, aspectRatio, 0.1, 1000);
+    camera.position.copy(defaultCameraPosition);
+    camera.lookAt(defaultLookAt);
+
+    // initialize panning targets to current camera's xy projection on z=0 plane
+    targetX = camera.position.x;
+    targetY = camera.position.y;
+
     // create renderer
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setClearColor(COLORS.black, 0); // transparent background
-    
+
     // append to dom
     const container = document.getElementById('background-canvas');
     container.appendChild(renderer.domElement);
-    
+
     // add event listeners
     document.addEventListener('mousemove', onDocumentMouseMove, false);
     window.addEventListener('resize', onWindowResize, false);
-    
+
     // add mouse drag panning event listeners
     document.addEventListener('mousedown', onMouseDown, false);
     document.addEventListener('mouseup', onMouseUp, false);
     document.addEventListener('mouseleave', onMouseUp, false); // treat like mouseup when cursor leaves window
-    
+
     // add mouse wheel zoom event listener
     document.addEventListener('wheel', onMouseWheel, { passive: false });
-    
+
     // add touch event listeners for mobile
     document.addEventListener('touchstart', onTouchStart, { passive: false });
     document.addEventListener('touchmove', onTouchMove, { passive: false });
     document.addEventListener('touchend', onTouchEnd, false);
-    
-    // add mouse wheel event listener for zooming
-    document.addEventListener('wheel', onMouseWheel, false);
-    
-    // add keyboard shortcut for centering (C key)
-    document.addEventListener('keydown', onKeyDown, false);
-    
+
     // create cutting mat background
     createCuttingMatBackground();
-    
+
     // initialize trigger areas visualization if in development mode
     if (DEVELOPMENT && window.initTriggerAreas) {
         window.initTriggerAreas(DEVELOPMENT);
     }
-    
+
     // initialize panning debug controls if in development mode
     if (DEVELOPMENT && window.createPanningDebugControls) {
         window.createPanningDebugControls();
     }
-    
+
     // initialize pan boundaries visualizer if in development mode
     if (DEVELOPMENT && window.visualizePanBoundaries) {
         let updatePanBoundaryVisualizer = window.visualizePanBoundaries();
         // Store in global variable for animation loop
         window.updatePanBoundaryVisualizer = updatePanBoundaryVisualizer;
     }
-    
+
     // start animation
     animate();
 }
 
-// Note: initTriggerAreas has been moved to debugging.js
+function focusOnObject(targetObject) {
+    isEpicShotViewActive = true;
+    animationParams.active = true;
+    animationParams.startTime = Date.now();
+
+    animationParams.sourcePos.copy(camera.position);
+    const currentDirection = camera.getWorldDirection(new THREE.Vector3());
+    // estimate current lookat: take a point in front of camera, at distance similar to current target or default
+    let estDist = defaultLookAt.distanceTo(camera.position);
+    if (animationParams.targetLookAt) { // if a previous targetlookat exists
+        estDist = animationParams.targetLookAt.distanceTo(camera.position);
+    }
+    animationParams.sourceLookAt.copy(camera.position).add(currentDirection.multiplyScalar(estDist));
+    animationParams.sourceFov = camera.fov;
+
+    // use the global epicshotoffset for camera positioning
+    animationParams.targetPos.copy(targetObject.position).add(epicShotOffset);
+
+    animationParams.targetLookAt.copy(targetObject.position);
+    animationParams.targetFov = epicShotFOV;
+}
 
 // create a cutting mat background with grid lines and angle guides
 function createCuttingMatBackground() {
     // create a background plane
     const bg = new THREE.Color(COLORS.background);
-    planeGeometry = new THREE.PlaneGeometry(100, 100); // large enough to feel infinite
     planeMaterial = new THREE.MeshBasicMaterial({ 
         color: bg,
         side: THREE.DoubleSide
@@ -248,12 +209,6 @@ function createCuttingMatBackground() {
     
     // create grid lines
     createGridLines();
-    
-    // create measurement markings
-    // createMeasurementMarkings();
-    
-    // create angle guides (diagonal lines)
-    // createAngleGuides();
 }
 
 // create grid lines
@@ -277,151 +232,6 @@ function createGridLines() {
     minorGridHelper.rotation.x = Math.PI / 2; // rotate to lie flat
     minorGridHelper.material = minorGridMaterial;
     scene.add(minorGridHelper);
-}
-
-// BUG: IS NOT SEEN ON THE SCREEN!
-// create measurement markings along the edges
-function createMeasurementMarkings() {
-    // we'll create line markings along the x and y axes
-    const markingLength = 0.2;
-    const markingMaterial = new THREE.LineBasicMaterial({ color: COLORS.white });
-    
-    // create markings along x-axis (bottom)
-    for (let i = -50; i <= 50; i++) {
-        if (i % 5 === 0) {
-            // create longer markings for multiples of 5
-            const heightMultiplier = 2;
-            
-            // create marking line
-            const markingGeometry = new THREE.BufferGeometry().setFromPoints([
-                new THREE.Vector3(i, -50, 0.01),
-                new THREE.Vector3(i, -50 + (markingLength * heightMultiplier), 0.01)
-            ]);
-            
-            const markingLine = new THREE.Line(markingGeometry, markingMaterial);
-            scene.add(markingLine);
-        } else {
-            // create regular markings
-            const markingGeometry = new THREE.BufferGeometry().setFromPoints([
-                new THREE.Vector3(i, -50, 0.01),
-                new THREE.Vector3(i, -50 + markingLength, 0.01)
-            ]);
-            
-            const markingLine = new THREE.Line(markingGeometry, markingMaterial);
-            scene.add(markingLine);
-        }
-    }
-    
-    // create markings along y-axis (left)
-    for (let i = -50; i <= 50; i++) {
-        if (i % 5 === 0) {
-            // create longer markings for multiples of 5
-            const widthMultiplier = 2;
-            
-            // create marking line
-            const markingGeometry = new THREE.BufferGeometry().setFromPoints([
-                new THREE.Vector3(-50, i, 0.01),
-                new THREE.Vector3(-50 + (markingLength * widthMultiplier), i, 0.01)
-            ]);
-            
-            const markingLine = new THREE.Line(markingGeometry, markingMaterial);
-            scene.add(markingLine);
-        } else {
-            // create regular markings
-            const markingGeometry = new THREE.BufferGeometry().setFromPoints([
-                new THREE.Vector3(-50, i, 0.01),
-                new THREE.Vector3(-50 + markingLength, i, 0.01)
-            ]);
-            
-            const markingLine = new THREE.Line(markingGeometry, markingMaterial);
-            scene.add(markingLine);
-        }
-    }
-}
-
-// BUG: IS NOT SEEN ON THE SCREEN!
-// create angle guides (diagonal lines at 45° angles)
-function createAngleGuides() {
-    // create material for diagonal lines
-    const diagonalMaterial = new THREE.LineBasicMaterial({ color: COLORS.white, transparent: true, opacity: 0.7 });
-    
-    // 45° diagonal from bottom-left to top-right
-    const diagonal1Geometry = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(-50, -50, 0.01),
-        new THREE.Vector3(50, 50, 0.01)
-    ]);
-    const diagonal1 = new THREE.Line(diagonal1Geometry, diagonalMaterial);
-    scene.add(diagonal1);
-    
-    // 45° diagonal from top-left to bottom-right
-    const diagonal2Geometry = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(-50, 50, 0.01),
-        new THREE.Vector3(50, -50, 0.01)
-    ]);
-    const diagonal2 = new THREE.Line(diagonal2Geometry, diagonalMaterial);
-    scene.add(diagonal2);
-    
-    // additional angle lines at 60° (as seen in the image)
-    const diagonal60Geometry1 = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(-50, -50 + 11.5, 0.01), // adjusted for 60° angle
-        new THREE.Vector3(50, 50 + 11.5, 0.01)
-    ]);
-    const diagonal60_1 = new THREE.Line(diagonal60Geometry1, diagonalMaterial);
-    scene.add(diagonal60_1);
-    
-    // angle label for 60°
-    addLabel("60°", -25, -10, 0.02);
-    
-    // additional angle lines at 30° (as seen in the image)
-    const diagonal30Geometry1 = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(-30, -50, 0.01),
-        new THREE.Vector3(50, -15, 0.01)
-    ]);
-    const diagonal30_1 = new THREE.Line(diagonal30Geometry1, diagonalMaterial);
-    scene.add(diagonal30_1);
-    
-    // angle label for 30°
-    addLabel("30°", 10, -35, 0.02);
-
-    // add more angle guides as needed
-}
-
-// helper function to add text labels
-function addLabel(text, x, y, z, options = {}) {
-    // since three.textgeometry requires the font to be loaded first,
-    // we'll use a simple alternative with a sprite-based approach
-    
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    const fontSize = options.fontSize || 18;
-    const textColor = options.color || COLORS.feedbackText;
-    const width = options.width || 200;``
-    const height = options.height || 100;
-    
-    canvas.width = width;
-    canvas.height = height;
-    
-    context.font = `${fontSize}px Arial`;
-    context.fillStyle = textColor;
-    context.fillText(text, 10, fontSize + 10);
-    
-    const texture = new THREE.CanvasTexture(canvas);
-    const material = new THREE.SpriteMaterial({ 
-        map: texture, 
-        transparent: true 
-    });
-    const sprite = new THREE.Sprite(material);
-    sprite.position.set(x, y, z);
-    
-    // use provided scale or default
-    const scaleX = options.scaleX || 1;
-    const scaleY = options.scaleY || 1;
-    sprite.scale.set(scaleX, scaleY, 1);
-    
-    scene.add(sprite);
-    
-    // return the sprite so we can reference it later
-    return sprite;
 }
 
 // create author meshes (called from scripts.js)
@@ -496,15 +306,15 @@ function createAuthorMeshes(authors) {
         
         const x = position.x;
         const y = position.y;
-        const z = 0.1; // slightly above the background
+        const z = boxSize * 2; // slightly above the background
         
         // create a box for this author with slight random rotation for visual interest
-        const geometry = new THREE.BoxGeometry(boxSize, boxSize, 0.1);
+        const geometry = new THREE.BoxGeometry(boxSize, boxSize, boxSize * 2);
         const mesh = new THREE.Mesh(geometry, normalMaterial.clone());
         mesh.position.set(x, y, z);
         
         // add slight random rotation for visual interest
-        mesh.rotation.z = Math.random() * 0.2 - 0.1;
+        mesh.rotation.z = Math.random() * 0.8 - 0.1;
         scene.add(mesh);
         
         // add author name label below the box
@@ -514,12 +324,12 @@ function createAuthorMeshes(authors) {
         const labelZ = z + 0.05;
         
         // only add label if in development mode
-        if (DEVELOPMENT) {
-            const label = addLabel(labelText, labelX, labelY, labelZ, {
-            fontSize: 30,
+        if (DEVELOPMENT && window.addLabel) { // ensure window.addlabel exists
+            const label = window.addLabel(scene, labelText, labelX, labelY, labelZ, { // call window.addlabel and pass scene
+            fontSize: 30, // this is pixels for canvas texture
             color: COLORS.labelText, 
-            scaleX: 1,
-            scaleY: 1
+            visualHeight: 0.15, // desired visual height in world units
+            // scalex and scaley are now calculated internally by addlabel based on visualheight
             });
 
             // store reference to both mesh and label
@@ -576,7 +386,7 @@ function createAuthorMeshes(authors) {
     // handle click on author boxes
     function onDocumentClick(event) {
         // don't process click if we were just dragging (to avoid accidental clicks)
-        if (isDragging || Math.abs(event.clientX - previousMousePosition.x) > 5 || 
+        if (animationParams.active || isDragging || Math.abs(event.clientX - previousMousePosition.x) > 5 || 
             Math.abs(event.clientY - previousMousePosition.y) > 5) {
             return;
         }
@@ -598,8 +408,9 @@ function createAuthorMeshes(authors) {
             
             if (clickedAuthor) {
                 console.log(`Author clicked: ${clickedAuthor.author}`);
-                // you can add more functionality here, like filtering articles
-                // by this author or displaying author information
+                
+                // switch to perspective camera and focus on the clicked mesh
+                focusOnObject(clickedMesh);
                 
                 // example: trigger a custom event that scripts.js can listen for
                 const authorClickEvent = new CustomEvent('authorClick', {
@@ -822,111 +633,176 @@ function onTouchEnd(event) {
 
 // handle mouse wheel for zooming
 function onMouseWheel(event) {
+    // allow scrolling if the mouse is over an article-text element
+    if (event.target.closest && event.target.closest('.article-text')) {
+        // do not prevent default, let the browser scroll the text
+        return;
+    }
     // prevent default scrolling
     event.preventDefault();
-    
+
+    if (animationParams.active) return; // don't zoom during transition
+
     // normalize wheel delta across browsers
     const delta = event.deltaY;
-    
-    // calculate zoom factor (smaller delta for smoother zooming)
-    const zoomFactor = 0.05;
-    
-    // update target scale based on wheel direction
-    if (delta > 0) {
-        // zoom out
-        targetScale = Math.max(targetScale - zoomFactor, minScale);
-    } else {
-        // zoom in
-        targetScale = Math.min(targetScale + zoomFactor, maxScale);
+
+    if (isEpicShotViewActive) {
+        if (delta > 0) { // zooming out
+            centerCamera(); // transition back to default view
+        } else { // zooming in
+            camera.fov = Math.max(20, camera.fov - 3); // decrease fov to zoom in, clamp
+            camera.updateProjectionMatrix();
+        }
+    } else { // default perspective view zooming
+        const zoomSensitivity = 0.005; // sensitivity for proportional zoom
+        const lookAtPoint = new THREE.Vector3(targetX, targetY, 0);
+        let currentDistance = camera.position.distanceTo(lookAtPoint);
+
+        const minZoomDist = 1.5; // minimum distance to the look-at point
+        const maxZoomDist = 30;  // maximum distance from the look-at point
+
+        // if camera is at (or extremely close to) the lookatpoint
+        if (currentDistance < 0.01) {
+            if (event.deltaY > 0) { // trying to zoom out (scroll down) from the point
+                // move camera along its view direction (away from lookatpoint) to minzoomdist
+                let moveDir = camera.getWorldDirection(new THREE.Vector3()).negate(); // vector from lookatpoint to camera
+                if (moveDir.lengthSq() < 0.001) { // if camera has no defined direction (e.g. at origin, looking at origin)
+                    moveDir.set(0, 0, 0); // use a default upward direction
+                }
+                camera.position.copy(lookAtPoint).add(moveDir.normalize().multiplyScalar(minZoomDist));
+                camera.lookAt(lookAtPoint);
+            }
+            // if trying to zoom in while already at the point, do nothing
+            return;
+        }
+
+        // calculate movefactor for camera movement along its view direction:
+        // positive movefactor means zoom in (move camera forward, scroll up, event.deltay < 0)
+        // negative movefactor means zoom out (move camera backward, scroll down, event.deltay > 0)
+        // movefactor is proportional to currentdistance for consistent zoom feel
+        
+        let effectiveDistanceForSensitivity;
+        // if currentdistance is very small (but not zero), use 1.0 for sensitivity.
+        // this implies currentdistance >= 0.001 due to the preceding 'if' block's 'return'.
+        if (currentDistance < 1.0) { 
+            effectiveDistanceForSensitivity = 1.0;
+        } else { // currentdistance >= 1.0
+            effectiveDistanceForSensitivity = currentDistance;
+        }
+
+        // invert event.deltay effect: scroll down (positive delta) should zoom out (negative movefactor)
+        let moveFactor = -event.deltaY * zoomSensitivity * effectiveDistanceForSensitivity;
+        
+        const direction = camera.getWorldDirection(new THREE.Vector3()); // normalized direction camera is looking
+        // if movefactor is positive (zoom in), add to position along direction.
+        // if movefactor is negative (zoom out), subtract from position along direction (effectively add(direction * negative_val)).
+        const newPosCandidate = camera.position.clone().add(direction.multiplyScalar(moveFactor));
+
+        // vector from lookatpoint to the new candidate position
+        const vecFromLookAtToCandidate = newPosCandidate.clone().sub(lookAtPoint);
+        let distCandidate = vecFromLookAtToCandidate.length();
+
+        if (distCandidate < 0.001) { // candidate landed exactly on the lookatpoint
+            // this can happen if movefactor was exactly -currentdistance along view direction.
+            // place camera at minzoomdist along the original view line.
+            let dir = camera.getWorldDirection(new THREE.Vector3()).negate(); // original vector from lookatpoint to camera
+            if(dir.lengthSq() < 0.001) dir.set(0,0,1); // default if no direction
+            camera.position.copy(lookAtPoint).add(dir.normalize().multiplyScalar(minZoomDist));
+        } else {
+            // clamp the distance of the candidate position
+            const clampedDistance = Math.max(minZoomDist, Math.min(maxZoomDist, distCandidate));
+            // set camera to the new clamped position
+            camera.position.copy(lookAtPoint).add(vecFromLookAtToCandidate.normalize().multiplyScalar(clampedDistance));
+        }
+        
+        camera.lookAt(lookAtPoint); // ensure camera continues to look at the target
     }
-    
-    // Record current mouse position for potential future features
-    // like zooming towards the cursor position
-    const mousePos = {
-        x: event.clientX,
-        y: event.clientY
-    };
-    
-    // In a more advanced implementation, we could use mousePos to zoom
-    // toward the cursor position rather than the center of the screen
 }
 
 // handle window resize
 function onWindowResize() {
     windowHalfX = window.innerWidth / 2;
     windowHalfY = window.innerHeight / 2;
-    
-    const aspectRatio = window.innerWidth / window.innerHeight;
-    const cameraWidth = 10 / targetScale; // account for zoom level
-    const cameraHeight = cameraWidth / aspectRatio;
-    
-    camera.left = -cameraWidth / 2;
-    camera.right = cameraWidth / 2;
-    camera.top = cameraHeight / 2;
-    camera.bottom = -cameraHeight / 2;
+
+    camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
-    
+
     renderer.setSize(window.innerWidth, window.innerHeight);
-    
+
     // redraw trigger areas if in development mode
     if (DEVELOPMENT && window.drawTriggerAreas) {
         window.drawTriggerAreas();
     }
 }
 
-// handle key down for keyboard shortcuts
-function onKeyDown(event) {
-    // 'C' key to center the camera
-    if (event.key === 'c' || event.key === 'C') {
-        centerCamera();
-    }
-}
-
 // animation loop
 function animate() {
     requestAnimationFrame(animate);
-    
-    // panning logic - when mouse is near the edges
-    if (isPanning) {
-        // update target position based on pan direction and speed
-        targetX += panDirection.x * panSpeed;
-        targetY += panDirection.y * panSpeed;
-    }
-    
-    // apply region panning limits if enabled
-    if (panBoundaries.enabled) {
-        // calculate effective boundaries based on current zoom level
-        // as we zoom out, the boundaries need to shrink since the camera can see more area
-        const zoomFactor = 1 / targetScale;
-        const effectiveMinX = panBoundaries.minX * zoomFactor;
-        const effectiveMaxX = panBoundaries.maxX * zoomFactor;
-        const effectiveMinY = panBoundaries.minY * zoomFactor;
-        const effectiveMaxY = panBoundaries.maxY * zoomFactor;
+
+    if (animationParams.active) {
+        const progress = Math.min((Date.now() - animationParams.startTime) / animationParams.duration, 1);
+        const easeProgress = 1 - Math.pow(1 - progress, 4); // easeoutquart
+
+        camera.position.lerpVectors(animationParams.sourcePos, animationParams.targetPos, easeProgress);
         
-        // clamp target position to boundaries
-        targetX = Math.max(effectiveMinX, Math.min(targetX, effectiveMaxX));
-        targetY = Math.max(effectiveMinY, Math.min(targetY, effectiveMaxY));
+        const currentLookAt = new THREE.Vector3().lerpVectors(animationParams.sourceLookAt, animationParams.targetLookAt, easeProgress);
+        camera.lookAt(currentLookAt);
+
+        camera.fov = animationParams.sourceFov + (animationParams.targetFov - animationParams.sourceFov) * easeProgress;
+        camera.updateProjectionMatrix();
+
+        if (progress >= 1) {
+            animationParams.active = false;
+            camera.position.copy(animationParams.targetPos); // ensure final state
+            camera.lookAt(animationParams.targetLookAt);
+            camera.fov = animationParams.targetFov;
+            camera.updateProjectionMatrix();
+            if (!isEpicShotViewActive) { // if we animated back to default view
+                targetX = camera.position.x; // update panning targets
+                targetY = camera.position.y;
+                 // ensure lookat is on the z=0 plane for default view after animation
+                camera.lookAt(targetX, targetY, 0);
+            }
+        }
+    } else { // not animating, handle panning and dragging
+        if (!isEpicShotViewActive) {
+            if (isPanning) {
+                // simple world-space panning for top-down like view
+                targetX += panDirection.x * panSpeed;
+                targetY += panDirection.y * panSpeed;
+            }
+            if (isDragging) {
+                // this needs to be adapted for perspective if not already
+                // current drag logic updates targetx, targety directly
+            }
+
+            // apply region panning limits if enabled
+            if (panBoundaries.enabled) {
+                // perspective zoom affects how much you can pan. this might need adjustment.
+                // for now, using existing boundary logic with targetx, targety
+                const effectiveMinX = panBoundaries.minX; 
+                const effectiveMaxX = panBoundaries.maxX;
+                const effectiveMinY = panBoundaries.minY;
+                const effectiveMaxY = panBoundaries.maxY;
+
+                targetX = Math.max(effectiveMinX, Math.min(targetX, effectiveMaxX));
+                targetY = Math.max(effectiveMinY, Math.min(targetY, effectiveMaxY));
+            }
+
+            // smooth camera movement towards targetx, targety
+            // z position is handled by zoom logic or animation
+            camera.position.x += (targetX - camera.position.x) * moveSpeed;
+            camera.position.y += (targetY - camera.position.y) * moveSpeed;
+            
+            // always look at the targetxy plane for default view
+            camera.lookAt(targetX, targetY, 0);
+        }
+        // if isEpicShotViewActive and not animating, camera is static or user-zoomed (fov)
     }
-    
-    // smooth camera movement
-    camera.position.x += (targetX - camera.position.x) * moveSpeed;
-    camera.position.y += (targetY - camera.position.y) * moveSpeed;
-    
-    // apply zoom (scale) to the camera
-    const aspectRatio = window.innerWidth / window.innerHeight;
-    const cameraWidth = 10 / targetScale; // divide by scale to zoom in/out
-    const cameraHeight = cameraWidth / aspectRatio;
-    
-    // smoothly update camera orthographic settings
-    camera.left += ((-cameraWidth / 2) - camera.left) * zoomSpeed;
-    camera.right += ((cameraWidth / 2) - camera.right) * zoomSpeed;
-    camera.top += ((cameraHeight / 2) - camera.top) * zoomSpeed;
-    camera.bottom += ((-cameraHeight / 2) - camera.bottom) * zoomSpeed;
-    camera.updateProjectionMatrix();
-    
+
     // render scene
     renderer.render(scene, camera);
-    
+
     // draw development visuals if enabled
     if (DEVELOPMENT) {
         // update edge trigger visualizers
@@ -946,10 +822,7 @@ function animate() {
     }
 }
 
-// Note: drawTriggerAreas and createTriggerVisualizer have been moved to debugging.js
-
 // expose functions to global scope
 window.initThreeJS = initThreeJS;
 window.createAuthorMeshes = createAuthorMeshes;
-window.centerCamera = centerCamera;
 window.centerCamera = centerCamera;
