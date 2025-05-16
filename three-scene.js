@@ -1,4 +1,4 @@
-let DEVELOPMENT = true;
+let DEVELOPMENT = false;
 
 // global variables
 let scene, camera, renderer;
