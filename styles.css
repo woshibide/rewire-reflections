@@ -38,6 +38,14 @@
     box-sizing: border-box;
     scrollbar-width: none;
     -ms-overflow-style: none;
+
+    /* make highlighting impossible */
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
 }
 
 body {
