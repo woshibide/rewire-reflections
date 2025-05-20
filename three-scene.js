@@ -641,19 +641,34 @@ function onMouseWheel(event) {
     // prevent default scrolling
     event.preventDefault();
 
-    if (animationParams.active) return; // don't zoom during transition
-
+    if (animationParams.active) return; // do not zoom while animating
     // normalize wheel delta across browsers
     const delta = event.deltaY;
 
+    // epic shot view zoom handling
     if (isEpicShotViewActive) {
-        if (delta > 0) { // zooming out
-            centerCamera(); // transition back to default view
-        } else { // zooming in
-            camera.fov = Math.max(20, camera.fov - 3); // decrease fov to zoom in, clamp
+        const buffer = 0.1 * (epicShotFOV - defaultFOV);
+        const exitFovThreshold = epicShotFOV - buffer;
+        const minFov = defaultFOV;
+        const maxFov = epicShotFOV;
+        // scroll down (delta > 0) should zoom out (increase fov)
+        if (delta > 0) {
+            camera.fov = Math.min(camera.fov + zoomSpeed * 0.5, maxFov);
+            camera.updateProjectionMatrix();
+            // exit epic shot view if zoomed out beyond threshold
+            if (camera.fov >= exitFovThreshold) {
+                isEpicShotViewActive = false;
+                camera.fov = defaultFOV;
+                camera.updateProjectionMatrix();
+            }
+        }
+        // scroll up (delta < 0) should zoom in (decrease fov)
+        else if (delta < 0) {
+            camera.fov = Math.max(camera.fov - zoomSpeed * 0.5, minFov);
             camera.updateProjectionMatrix();
         }
-    } else { // default perspective view zooming
+        return;
+    } else {
         const zoomSensitivity = 0.005; // sensitivity for proportional zoom
         const lookAtPoint = new THREE.Vector3(targetX, targetY, 0);
         let currentDistance = camera.position.distanceTo(lookAtPoint);
@@ -685,7 +700,7 @@ function onMouseWheel(event) {
         // if currentdistance is very small (but not zero), use 1.0 for sensitivity.
         // this implies currentdistance >= 0.001 due to the preceding 'if' block's 'return'.
         if (currentDistance < 1.0) { 
-            effectiveDistanceForSensitivity = 1.0;
+            effectiveDistanceForSensitivity = 10.0;
         } else { // currentdistance >= 1.0
             effectiveDistanceForSensitivity = currentDistance;
         }

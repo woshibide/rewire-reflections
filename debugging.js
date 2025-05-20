@@ -1,3 +1,6 @@
+// set to true to show the work in progress overlay
+const SHOW_WIP_OVERLAY = true;
+
 // initialize trigger areas visualization if in development mode
 function initTriggerAreas(development) {
     if (development) {
@@ -534,6 +537,45 @@ function addLabel(scene, text, x, y, z, options = {}) {
     return sprite;
 }
 
+// show work in progress overlay
+function showWipOverlay() {
+    // create overlay container
+    const overlay = document.createElement('div');
+    overlay.id = 'wip-overlay';
+    overlay.className = 'wip-overlay'; 
+
+    // create image
+    const img = document.createElement('img');
+    img.src = './assets/photos/wip.png';
+    img.alt = 'work in progress';
+    img.className = 'wip-overlay-img';
+    overlay.appendChild(img);
+
+    // create message
+    const msg = document.createElement('div');
+    msg.textContent = 'we are still working on it (◡ ‿ ◡ .)';
+    msg.className = 'wip-overlay-msg';
+    overlay.appendChild(msg);
+
+    // create okay button
+    const btn = document.createElement('button');
+    btn.textContent = 'okay';
+    btn.className = 'wip-overlay-btn';
+    btn.addEventListener('click', function(e) {
+        e.stopPropagation(); // prevent event from bubbling
+        overlay.remove();
+    });
+    overlay.appendChild(btn);
+
+    // add overlay to body
+    document.body.appendChild(overlay);
+}
+
+// show the overlay as soon as possible if enabled
+if (SHOW_WIP_OVERLAY) {
+    showWipOverlay();
+}
+
 // expose functions to global scope
 window.initTriggerAreas = initTriggerAreas;
 window.drawTriggerAreas = drawTriggerAreas;
@@ -543,3 +585,4 @@ window.removeAuthorRegionVisualizer = removeAuthorRegionVisualizer;
 window.removePanBoundaryVisualizer = removePanBoundaryVisualizer;
 window.createPanningDebugControls = createPanningDebugControls;
 window.addLabel = addLabel;
+window.showWipOverlay = showWipOverlay;

@@ -1,5 +1,3 @@
-// main script file - three.js functionality has been moved to three-scene.js
-
 // fetch authors data and create the article elements
 async function loadArticles() {
     try {
@@ -13,8 +11,8 @@ async function loadArticles() {
         initThreeJS();
         createAuthorMeshes(uniqueAuthors);
         
-        // render articles
-        renderArticles(data.articles);
+        // initialize with empty container - no content shown initially
+        renderArticles(data.articles, false);
         
         // setup filter functionality
         setupFilters(data.articles);
@@ -59,9 +57,15 @@ async function loadArticles() {
 }
 
 // render article elements to the dom
-function renderArticles(articles) {
+function renderArticles(articles, showContent = false) {
     const container = document.getElementById('articles-container');
     container.innerHTML = '';
+    
+    // if showContent is false, don't render any articles
+    // this ensures no content is shown until filters are applied or an author is clicked
+    if (!showContent) {
+        return;
+    }
     
     articles.forEach(article => {
         const articleElement = document.createElement('div');
@@ -70,7 +74,7 @@ function renderArticles(articles) {
         articleElement.dataset.theme = article.theme;
         articleElement.dataset.type = article.type;
         
-        // build the article html, including the text if present
+        // build the article html
         articleElement.innerHTML = `
             <div class="author">${article.author}</div>
             <div class="title">${article.title}</div>
@@ -133,8 +137,11 @@ function applyFilters(allArticles) {
         return true;
     });
     
-    // render filtered articles
-    renderArticles(filteredArticles);
+    // only show content if there are active filters
+    const hasActiveFilters = Object.keys(activeFilters).length > 0;
+    
+    // render filtered articles - only show if filters are active
+    renderArticles(filteredArticles, hasActiveFilters);
 }
 
 // function to filter articles by author
@@ -142,10 +149,10 @@ function filterArticlesByAuthor(author, allArticles) {
     // filter the articles to only show the clicked author's work
     const filteredArticles = allArticles.filter(article => article.author === author);
     
-    // update the display
-    renderArticles(filteredArticles);
+    // update the display - show content when filtering by author
+    renderArticles(filteredArticles, true);
     
-    // update any ui to show we're filtering (you could add this later)
+    // update any ui to show we're filtering
     console.log(`filtering articles by author: ${author}`);
 }
 
