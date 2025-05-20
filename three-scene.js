@@ -7,6 +7,8 @@ let mouseX = 0, mouseY = 0;
 let windowHalfX = window.innerWidth / 2;
 let windowHalfY = window.innerHeight / 2;
 let targetX = 0, targetY = 0;
+// global variable to store author objects for filter opacity updates
+let authorObjects = [];
 
 // color palette for easy customization of the 3d canvas
 const COLORS = {
@@ -237,7 +239,7 @@ function createGridLines() {
 // create author meshes (called from scripts.js)
 function createAuthorMeshes(authors) {
     // track all author objects for interactivity
-    const authorObjects = [];
+    authorObjects = [];
     
     // define the region bounds for random placement
     const boxSize = 1.0;  // size of each author box
@@ -267,6 +269,8 @@ function createAuthorMeshes(authors) {
         transparent: true,
         opacity: 0.8
     });
+    
+    // no need for CSS transitions, we'll use THREE.js animations
     
     // helper function to generate random position within our defined region
     function generateRandomPosition() {
@@ -424,6 +428,85 @@ function createAuthorMeshes(authors) {
     // return the author objects for reference elsewhere if needed
     return authorObjects;
 }
+
+// function to update author meshes opacity based on filtered authors
+function updateAuthorOpacity(filteredAuthors = null) {
+    const DEFAULT_OPACITY = 0.8;
+    const FADED_OPACITY = 0.2;
+    const TRANSITION_DURATION = 500; // ms
+    
+    // if no filtered authors, show all author meshes at full opacity
+    if (!filteredAuthors || filteredAuthors.length === 0) {
+        authorObjects.forEach(obj => {
+            // create a smooth transition
+            const startOpacity = obj.mesh.material.opacity;
+            const endOpacity = DEFAULT_OPACITY;
+            
+            const startTime = Date.now();
+            
+            // create animation function
+            function animateOpacity() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / TRANSITION_DURATION, 1);
+                
+                obj.mesh.material.opacity = startOpacity + (endOpacity - startOpacity) * progress;
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animateOpacity);
+                }
+            }
+            
+            // start animation
+            animateOpacity();
+        });
+        return;
+    }
+    
+    // get list of author names from the filtered articles
+    let filteredAuthorNames = [];
+    
+    // handle potential multiple authors in a single author field (e.g., "Author1 + Author2")
+    filteredAuthors.forEach(article => {
+        const authorField = article.author;
+        if (authorField.includes('+')) {
+            // split multiple authors
+            const authors = authorField.split('+').map(name => name.trim());
+            filteredAuthorNames = filteredAuthorNames.concat(authors);
+        } else {
+            filteredAuthorNames.push(authorField);
+        }
+    });
+    
+    // update opacity for each author box with smooth transition
+    authorObjects.forEach(obj => {
+        // determine target opacity
+        const targetOpacity = filteredAuthorNames.includes(obj.author) ? DEFAULT_OPACITY : FADED_OPACITY;
+        
+        // create a smooth transition
+        const startOpacity = obj.mesh.material.opacity;
+        const endOpacity = targetOpacity;
+        
+        const startTime = Date.now();
+        
+        // create animation function
+        function animateOpacity() {
+            const elapsed = Date.now() - startTime;
+            const progress = Math.min(elapsed / TRANSITION_DURATION, 1);
+            
+            obj.mesh.material.opacity = startOpacity + (endOpacity - startOpacity) * progress;
+            
+            if (progress < 1) {
+                requestAnimationFrame(animateOpacity);
+            }
+        }
+        
+        // start animation
+        animateOpacity();
+    });
+}
+
+// expose the function to global scope
+window.updateAuthorOpacity = updateAuthorOpacity;
 
 // handle mouse movement
 function onDocumentMouseMove(event) {

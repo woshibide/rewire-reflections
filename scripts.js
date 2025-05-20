@@ -1,11 +1,20 @@
 // fetch authors data and create the article elements
 async function loadArticles() {
     try {
-        const response = await fetch('authors.json');
+        const response = await fetch('./authors.json');
         const data = await response.json();
         
         // get unique authors for the three.js background
-        const uniqueAuthors = [...new Set(data.articles.map(article => article.author))];
+        // extract all authors, accounting for multi-author entries with "+"
+        const allAuthors = data.articles.flatMap(article => {
+            if (article.author.includes('+')) {
+                return article.author.split('+').map(name => name.trim());
+            }
+            return article.author;
+        });
+        
+        // create a unique set of author names
+        const uniqueAuthors = [...new Set(allAuthors)];
         
         // initialize three.js scene with author names
         initThreeJS();
@@ -14,8 +23,16 @@ async function loadArticles() {
         // initialize with empty container - no content shown initially
         renderArticles(data.articles, false);
         
+        // dynamically generate filter options
+        generateFilters(data.articles);
+        
         // setup filter functionality
         setupFilters(data.articles);
+        
+        // ensure all author cubes start at full opacity
+        if (window.updateAuthorOpacity) {
+            window.updateAuthorOpacity(null);
+        }
         
         // add event listener for author clicks from three.js scene
         document.addEventListener('authorClick', (event) => {
@@ -87,6 +104,78 @@ function renderArticles(articles, showContent = false) {
     });
 }
 
+// function to create filter options dynamically from articles data
+function generateFilters(articles) {
+    // get all unique values for each filter type
+    const filterTypes = ['year', 'theme', 'type'];
+    const filterValues = {};
+    
+    // initialize filter values for each type
+    filterTypes.forEach(type => {
+        filterValues[type] = new Set();
+    });
+    
+    // collect all unique values for each filter type
+    articles.forEach(article => {
+        filterTypes.forEach(type => {
+            if (article[type]) {
+                // if the property contains multiple values (comma-separated)
+                if (typeof article[type] === 'string' && article[type].includes(',')) {
+                    article[type].split(',').forEach(value => {
+                        filterValues[type].add(value.trim());
+                    });
+                } else {
+                    filterValues[type].add(article[type]);
+                }
+            }
+        });
+    });
+    
+    // create filter sections in the DOM
+    const filtersContainer = document.querySelector('.filters');
+    if (!filtersContainer) {
+        console.error('filters container not found');
+        return;
+    }
+    
+    // clear existing filters
+    filtersContainer.innerHTML = '';
+    
+    // create filter sections for each type
+    filterTypes.forEach(type => {
+        // only create a section if we have values for this filter type
+        if (filterValues[type].size > 0) {
+            // create filter section
+            const section = document.createElement('div');
+            section.className = 'filter-section';
+            
+            // create heading
+            const heading = document.createElement('h2');
+            heading.textContent = type.charAt(0).toUpperCase() + type.slice(1); // capitalize first letter
+            section.appendChild(heading);
+            
+            // create list
+            const list = document.createElement('ul');
+            
+            // create list items for each value
+            [...filterValues[type]].sort().forEach(value => {
+                const listItem = document.createElement('li');
+                const link = document.createElement('a');
+                link.href = '#';
+                link.dataset.filter = type;
+                link.dataset.value = value;
+                link.textContent = value;
+                
+                listItem.appendChild(link);
+                list.appendChild(listItem);
+            });
+            
+            section.appendChild(list);
+            filtersContainer.appendChild(section);
+        }
+    });
+}
+
 // setup filter functionality
 function setupFilters(allArticles) {
     const filterLinks = document.querySelectorAll('.filter-section a');
@@ -129,8 +218,22 @@ function applyFilters(allArticles) {
     // filter articles
     const filteredArticles = allArticles.filter(article => {
         for (const [filterType, filterValue] of Object.entries(activeFilters)) {
-            // ensure article property exists and compare in lowercase
-            if (!article[filterType] || article[filterType].toLowerCase() !== filterValue) {
+            // ensure article property exists
+            if (!article[filterType]) {
+                return false;
+            }
+            
+            const articleValue = article[filterType].toString().toLowerCase();
+            
+            // check if the article's value contains multiple values (comma-separated)
+            if (articleValue.includes(',')) {
+                // split by comma and check if any value matches the filter
+                const values = articleValue.split(',').map(v => v.trim());
+                if (!values.includes(filterValue)) {
+                    return false;
+                }
+            } else if (articleValue !== filterValue) {
+                // simple value comparison
                 return false;
             }
         }
@@ -142,15 +245,43 @@ function applyFilters(allArticles) {
     
     // render filtered articles - only show if filters are active
     renderArticles(filteredArticles, hasActiveFilters);
+    
+    // update author cube opacity based on filtered articles
+    if (window.updateAuthorOpacity) {
+        // if no active filters, pass null to reset all cubes to default opacity
+        if (!hasActiveFilters) {
+            window.updateAuthorOpacity(null);
+        } else {
+            window.updateAuthorOpacity(filteredArticles);
+        }
+    }
 }
 
 // function to filter articles by author
 function filterArticlesByAuthor(author, allArticles) {
     // filter the articles to only show the clicked author's work
-    const filteredArticles = allArticles.filter(article => article.author === author);
+    const filteredArticles = allArticles.filter(article => {
+        // exact match
+        if (article.author === author) {
+            return true;
+        }
+        
+        // check for author in a multi-author entry (e.g., "Author1 + Author2")
+        if (article.author.includes('+')) {
+            const authors = article.author.split('+').map(name => name.trim());
+            return authors.includes(author);
+        }
+        
+        return false;
+    });
     
     // update the display - show content when filtering by author
     renderArticles(filteredArticles, true);
+    
+    // update author cube opacity based on filtered articles
+    if (window.updateAuthorOpacity) {
+        window.updateAuthorOpacity(filteredArticles);
+    }
     
     // update any ui to show we're filtering
     console.log(`filtering articles by author: ${author}`);
