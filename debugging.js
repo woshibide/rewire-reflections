@@ -1,5 +1,5 @@
 // set to true to show the work in progress overlay
-const SHOW_WIP_OVERLAY = true;
+const SHOW_WIP_OVERLAY = false;
 
 // initialize trigger areas visualization if in development mode
 function initTriggerAreas(development) {

@@ -7,11 +7,10 @@
     <title>Rewire Reflections</title>
 
     <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" href="./search.css">
     <link rel="stylesheet" href="./debugging.css">
     <!-- three.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- normalize -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
 </head>
 
 <body>
@@ -19,9 +18,19 @@
 
     <div class="container">
         <header>
-            <h1>Rewire<br>Reflections</h1>
-        
-
+            <h1>Rewire Reflections Archive</h1>
+            <form role="search" id="search-form" action="#" onsubmit="return false;">
+                <div id="search-bar">
+                    <input type="search" id="search-input" name="query" placeholder="title or author" aria-label="Search for articles by title or author" autocomplete="off">
+                    <button type="submit" id="search-button" aria-label="Submit search">
+                        <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8"/>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                        </svg>
+                    </button>
+                </div>
+            </form>
+            
         <div class="filters">
             <div class="filter-section">
                 <h2>Year</h2>
@@ -51,12 +60,14 @@
                 </div>
             </div>
         </header>
+        
         <div class="articles-container" id="articles-container">
             <!-- Articles will be loaded here from authors.json -->
     </div>
 
     <script src="./three-scene.js"></script>
     <script src="./debugging.js"></script>
+    <script src="./search.js"></script>
     <script src="./scripts.js"></script>
 </body>
 

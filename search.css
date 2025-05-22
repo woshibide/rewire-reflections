@@ -1,0 +1,209 @@
+
+/**
+ * search component styles
+ * a masterclass in front-end search bar styling
+ */
+
+/* search container styles */
+#search-form {
+    position: relative;
+    width: 100%;
+}
+
+/* main search bar styling */
+#search-bar {
+    display: flex;
+    align-items: center;
+    background-color: var(--color-bg-light);
+    border-radius: var(--border-radius-full);
+    padding: 0.25rem 0.5rem 0.25rem 1rem;
+    border: var(--color-border) 2px solid;
+    transition: all 0.2s ease-in-out;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 2px 4px var(--color-shadow-light);
+}
+
+/* search bar hover and focus states */
+#search-bar:hover {
+    border-color: var(--color-accent);
+}
+
+#search-bar:focus-within {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(191, 242, 5, 0.2);
+    transform: translateY(-1px);
+}
+
+/* input field styling */
+#search-input {
+    background: transparent;
+    border-radius: var(--border-radius-full);
+    border: none;
+    padding: 0.5rem 0.25rem;
+    font-size: var(--font-toggle);
+    font-family: "apfel", Arial, sans-serif;
+    color: var(--color-text);
+    width: 100%;
+    outline: none;
+}
+#search-input:focus {
+    border: none;
+}
+
+/* search input placeholder styling with animation */
+#search-input::placeholder {
+    color: var(--color-accent);
+    opacity: 0.7;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+#search-input:focus::placeholder {
+    opacity: 0.4;
+    transform: translateX(3px);
+}
+
+/* search button styling */
+#search-button {
+    background: transparent;
+    border: none;
+    margin-left: auto;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--border-radius-full);
+    transition: all 0.2s ease;
+    width: 48px;
+    margin: 0;
+    padding: 0.25rem;
+}
+
+/* button hover and active states */
+#search-button:hover {
+    background-color: var(--color-shadow-light);
+    transform: scale(1.05);
+}
+
+#search-button:active {
+    transform: scale(0.95);
+}
+
+/* search icon styling */
+#search-button .search-icon {
+    stroke: var(--color-accent);
+    transition: stroke 0.2s ease, transform 0.2s ease;
+}
+
+#search-bar:focus-within #search-button .search-icon {
+    stroke: var(--color-primary);
+}
+
+#search-button:hover .search-icon {
+    transform: rotate(-5deg);
+}
+
+/* search animations */
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+#search-button.searching .search-icon {
+    animation: pulse 0.3s ease;
+}
+
+/* keyboard shortcut hint styling */
+.search-shortcut {
+    position: absolute;
+    bottom: -1.25rem;
+    right: 0.5rem;
+    font-size: 0.7rem;
+    color: var(--color-accent);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+}
+
+#search-form:hover .search-shortcut,
+#search-form:focus-within .search-shortcut {
+    opacity: 0.6;
+}
+
+
+
+/* clearable input with x button on focus - optional enhancement */
+#search-input::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    height: 1em;
+    width: 1em;
+    border-radius: 50em;
+    background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'><line x1='18' y1='6' x2='6' y2='18'></line><line x1='6' y1='6' x2='18' y2='18'></line></svg>") no-repeat 50% 50%;
+    background-size: contain;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+#search-input:focus::-webkit-search-cancel-button {
+    opacity: 0.7;
+    pointer-events: all;
+}
+
+#search-input:focus::-webkit-search-cancel-button:hover {
+    opacity: 1;
+}
+
+/* search results highlight styling */
+.search-highlight {
+    background-color: var(--color-feedback-bg);
+    padding: 0 0.15rem;
+    border-radius: var(--border-radius-sm);
+}
+
+/* responsive adjustments */
+@media (max-width: 768px) {
+    #search-bar {
+        padding: 0.15rem 0.4rem 0.15rem 0.75rem;
+    }
+    
+    #search-input {
+        padding: 0.4rem 0.25rem;
+        font-size: 0.9rem;
+    }
+    
+    #search-button {
+        padding: 0.35rem;
+    }
+    
+    .search-shortcut {
+        display: none;
+    }
+}
+
+/* accessibility focus ring for keyboard navigation */
+#search-input:focus-visible,
+#search-button:focus-visible {
+    outline-offset: 2px;
+}
+
+/**
+ * animation showing search functionality (visual only)
+ * this would be replaced with real functionality
+ */
+@keyframes typing {
+    from { width: 0 }
+    to { width: 100% }
+}
+
+@keyframes blink {
+    50% { border-color: transparent }
+}
+
+/* style specifically for when search button is in active state */
+#search-button.input-focused {
+    background-color: var(--color-shadow-light);
+    border: none;
+}

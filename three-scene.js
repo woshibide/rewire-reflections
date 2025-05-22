@@ -514,6 +514,22 @@ function onDocumentMouseMove(event) {
     mouseX = event.clientX;
     mouseY = event.clientY;
     
+    // check if mouse is over the header - if so, don't trigger three.js interactions
+    const header = document.querySelector('header');
+    if (header) {
+        const headerRect = header.getBoundingClientRect();
+        if (
+            mouseX >= headerRect.left && 
+            mouseX <= headerRect.right && 
+            mouseY >= headerRect.top && 
+            mouseY <= headerRect.bottom
+        ) {
+            // mouse is over header, don't trigger three.js panning/interactions
+            isPanning = false;
+            return;
+        }
+    }
+    
     // handle drag-based panning
     if (isDragging) {
         // calculate movement
@@ -645,6 +661,22 @@ function getPinchDistance(event) {
 
 // handle touch move for mobile panning and pinch-zoom
 function onTouchMove(event) {
+    // check if touch is over header - if so, let default scrolling happen
+    const header = document.querySelector('header');
+    if (header && event.touches.length > 0) {
+        const headerRect = header.getBoundingClientRect();
+        const touch = event.touches[0];
+        if (
+            touch.clientX >= headerRect.left && 
+            touch.clientX <= headerRect.right && 
+            touch.clientY >= headerRect.top && 
+            touch.clientY <= headerRect.bottom
+        ) {
+            // touch is over header, allow default behavior (scrolling)
+            return;
+        }
+    }
+    
     // prevent default to avoid page scrolling/zooming while interacting
     event.preventDefault();
     
@@ -716,6 +748,21 @@ function onTouchEnd(event) {
 
 // handle mouse wheel for zooming
 function onMouseWheel(event) {
+    // check if the mouse is over the header
+    const header = document.querySelector('header');
+    if (header) {
+        const headerRect = header.getBoundingClientRect();
+        if (
+            event.clientX >= headerRect.left && 
+            event.clientX <= headerRect.right && 
+            event.clientY >= headerRect.top && 
+            event.clientY <= headerRect.bottom
+        ) {
+            // mouse is over header, allow default scrolling behavior
+            return;
+        }
+    }
+    
     // allow scrolling if the mouse is over an article-text element
     if (event.target.closest && event.target.closest('.article-text')) {
         // do not prevent default, let the browser scroll the text
