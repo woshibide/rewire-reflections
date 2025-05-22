@@ -93,10 +93,14 @@ function renderArticles(articles, showContent = false) {
         
         // build the article html
         articleElement.innerHTML = `
-            <div class="author">${article.author}</div>
-            <div class="title">${article.title}</div>
-            <div class="description">${article.description}</div>
-            ${article.text ? `<div class="article-text">${article.text.replace(/\n/g, '<br>')}</div>` : ''}
+            <div class="article-left-column">
+                <h3 class="author">${article.author}</h3>
+                <div class="description">${article.description}</div>
+            </div>
+            <div class="article-right-column">
+                <div class="title">${article.title}</div>
+                ${article.text ? `<div class="article-text">${article.text.replace(/\n/g, '<br>')}</div>` : ''}
+            </div>
         `;
         
         // append the article element to the container
