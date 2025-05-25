@@ -1,6 +1,18 @@
+// initialize development mode at the start of execution
+window.DEVELOPMENT = false; // set to true to enable development features
+
 // fetch authors data and create the article elements
 async function loadArticles() {
     try {
+        // initialize development mode before loading articles
+        // check if URL has ?dev=true parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        const devMode = urlParams.get('dev');
+        window.DEVELOPMENT = devMode === 'true';
+        
+        // log development mode status
+        console.log(`archive mode: ${window.DEVELOPMENT ? 'development' : 'production'}`);
+        
         const response = await fetch('./authors.json');
         const data = await response.json();
         
@@ -106,6 +118,10 @@ function renderArticles(articles, showContent = false) {
         // append the article element to the container
         container.appendChild(articleElement);
     });
+    
+    // dispatch a custom event to notify that articles have been rendered
+    const articlesRenderedEvent = new CustomEvent('articlesRendered');
+    document.dispatchEvent(articlesRenderedEvent);
 }
 
 // function to create filter options dynamically from articles data
@@ -249,7 +265,7 @@ function applyFilters(allArticles) {
     
     // render filtered articles - only show if filters are active
     renderArticles(filteredArticles, hasActiveFilters);
-    
+        
     // update author cube opacity based on filtered articles
     if (window.updateAuthorOpacity) {
         // if no active filters, pass null to reset all cubes to default opacity
@@ -257,6 +273,15 @@ function applyFilters(allArticles) {
             window.updateAuthorOpacity(null);
         } else {
             window.updateAuthorOpacity(filteredArticles);
+        }
+    }
+        
+    // also update CSS3D elements if they exist
+    if (window.css3dIntegration && window.css3dIntegration.updateAuthorElementOpacity) {
+        if (!hasActiveFilters) {
+            window.css3dIntegration.updateAuthorElementOpacity(null);
+        } else {
+            window.css3dIntegration.updateAuthorElementOpacity(filteredArticles);
         }
     }
 }
@@ -285,6 +310,11 @@ function filterArticlesByAuthor(author, allArticles) {
     // update author cube opacity based on filtered articles
     if (window.updateAuthorOpacity) {
         window.updateAuthorOpacity(filteredArticles);
+    }
+    
+    // also update CSS3D elements if they exist
+    if (window.css3dIntegration && window.css3dIntegration.updateAuthorElementOpacity) {
+        window.css3dIntegration.updateAuthorElementOpacity(filteredArticles);
     }
     
     // update any ui to show we're filtering

@@ -2,6 +2,8 @@ let DEVELOPMENT = false;
 
 // global variables
 let scene, camera, renderer;
+// make scene available globally for debugging
+window.threeScene = null; // will be set after initialization
 let planeGeometry, planeMaterial, plane;
 let mouseX = 0, mouseY = 0;
 let windowHalfX = window.innerWidth / 2;
@@ -44,7 +46,7 @@ const maxPanSpeed = 0.15;            // maximum panning speed
 // mouse drag panning variables
 let isDragging = false;             // if we're currently dragging the scene
 let previousMousePosition = { x: 0, y: 0 };
-let dragSensitivity = 0.01;         // how sensitive the drag panning is
+let dragSensitivity = 0.015;         // how sensitive the drag panning is
 
 // pinch-to-zoom variables
 let initialPinchDistance = 0;       // initial distance between two touch points
@@ -56,6 +58,8 @@ let maxScale = 3;                   // maximum zoom level - will be repurposed
 
 // epic shot view state
 let isEpicShotViewActive = false;
+// list of elements that should allow normal scrolling (selectors)
+let scrollableElementSelectors = ['.article-text', 'header', 'description', 'title'];
 // default camera perspective settings
 const defaultFOV = 40;
 const defaultCameraPosition = new THREE.Vector3(0, 0, 10); // z higher for a more top-down feel
@@ -81,10 +85,10 @@ let animationParams = {
 // region panning boundaries
 let panBoundaries = {
     enabled: true,                 // whether to enforce pan boundaries
-    minX: -10,                     // leftmost limit for camera position.x
-    maxX: 10,                      // rightmost limit for camera position.x
-    minY: -8,                      // bottom limit for camera position.y
-    maxY: 8                        // top limit for camera position.y
+    minX: -20,                     // leftmost limit for camera position.x
+    maxX: 20,                      // rightmost limit for camera position.x
+    minY: -16,                      // bottom limit for camera position.y
+    maxY: 16                        // top limit for camera position.y
 };
 
 let updateRegionVisualizer = null;  // function to update author region visualizer
@@ -115,6 +119,7 @@ function centerCamera() {
 function initThreeJS() {
     // create scene
     scene = new THREE.Scene();
+    window.threeScene = scene; // make scene available globally for debugging
 
     // create camera (always perspective)
     const aspectRatio = window.innerWidth / window.innerHeight;
@@ -130,10 +135,28 @@ function initThreeJS() {
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setClearColor(COLORS.black, 0); // transparent background
+    
+    // make renderer settings browser-friendly
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.gammaFactor = 2.2;
+    renderer.gammaOutput = true;
 
     // append to dom
     const container = document.getElementById('background-canvas');
     container.appendChild(renderer.domElement);
+    
+    // expose scene and renderer globally for debugging
+    window.threeScene = scene;
+    window.threeRenderer = renderer;
+    window.threeCamera = camera;
+    
+    if (window.debugLog) {
+        window.debugLog('three.js initialized', { 
+            scene: scene, 
+            renderer: renderer,
+            camera: camera
+        });
+    }
 
     // add event listeners
     document.addEventListener('mousemove', onDocumentMouseMove, false);
@@ -216,8 +239,8 @@ function createCuttingMatBackground() {
 // create grid lines
 function createGridLines() {
     const gridSize = 100;       // size of the entire grid
-    const majorGridStep = 1;    // spacing for major grid lines
-    const minorGridStep = 0.1;  // spacing for minor grid lines
+    const majorGridStep = 5;    // spacing for major grid lines
+    const minorGridStep = 0.5;  // spacing for minor grid lines
     
     // create grid material
     const majorGridMaterial = new THREE.LineBasicMaterial({ color: COLORS.majorGrid, transparent: true, opacity: 0.5 });
@@ -243,8 +266,8 @@ function createAuthorMeshes(authors) {
     
     // define the region bounds for random placement
     const boxSize = 1.0;  // size of each author box
-    const regionWidth = 8;  // width of the region to place boxes in
-    const regionHeight = 6;  // height of the region to place boxes in
+    const regionWidth = 16;  // width of the region to place boxes in
+    const regionHeight = 20;  // height of the region to place boxes in
     const minDistance = 1.5; // minimum distance between box centers to prevent overlap
     
     // visualize the region if in development mode
@@ -257,7 +280,7 @@ function createAuthorMeshes(authors) {
         window.updateRegionVisualizer = window.visualizeAuthorRegion(regionWidth, regionHeight);
     }
     
-    // materials for the boxes (normal and hover states)
+    // materials for the boxes and text
     const normalMaterial = new THREE.MeshBasicMaterial({ 
         color: COLORS.primary,
         transparent: true,
@@ -269,8 +292,6 @@ function createAuthorMeshes(authors) {
         transparent: true,
         opacity: 0.8
     });
-    
-    // no need for CSS transitions, we'll use THREE.js animations
     
     // helper function to generate random position within our defined region
     function generateRandomPosition() {
@@ -293,136 +314,371 @@ function createAuthorMeshes(authors) {
         return false;
     }
     
-    // create a box and label for each author
-    const existingPositions = [];
-    authors.forEach((author, index) => {
-        // find a random position that isn't too close to existing boxes
-        let position;
-        let attempts = 0;
-        const maxAttempts = 50; // prevent infinite loops
-        
-        do {
-            position = generateRandomPosition();
-            attempts++;
-        } while (isTooClose(position, existingPositions) && attempts < maxAttempts);
-        
-        existingPositions.push(position);
-        
-        const x = position.x;
-        const y = position.y;
-        const z = boxSize * 2; // slightly above the background
-        
-        // create a box for this author with slight random rotation for visual interest
-        const geometry = new THREE.BoxGeometry(boxSize, boxSize, boxSize * 2);
-        const mesh = new THREE.Mesh(geometry, normalMaterial.clone());
-        mesh.position.set(x, y, z);
-        
-        // add slight random rotation for visual interest
-        mesh.rotation.z = Math.random() * 0.8 - 0.1;
-        scene.add(mesh);
-        
-        // add author name label below the box
-        const labelText = author;
-        const labelX = x;
-        const labelY = y - boxSize/2 - 0.3; // place label below the box
-        const labelZ = z + 0.05;
-        
-        // only add label if in development mode
-        if (DEVELOPMENT && window.addLabel) { // ensure window.addlabel exists
-            const label = window.addLabel(scene, labelText, labelX, labelY, labelZ, { // call window.addlabel and pass scene
-            fontSize: 30, // this is pixels for canvas texture
-            color: COLORS.labelText, 
-            visualHeight: 0.15, // desired visual height in world units
-            // scalex and scaley are now calculated internally by addlabel based on visualheight
+    // fetch article data for titles
+    fetch('./authors.json')
+        .then(response => response.json())
+        .then(data => {
+            // create a lookup for authors to their articles
+            const authorArticles = {};
+            data.articles.forEach(article => {
+                // handle multiple authors (e.g., "Author1 + Author2")
+                const articleAuthors = article.author.includes('+') ? 
+                    article.author.split('+').map(a => a.trim()) : 
+                    [article.author.trim()];
+                
+                articleAuthors.forEach(author => {
+                    if (!authorArticles[author]) {
+                        authorArticles[author] = [];
+                    }
+                    authorArticles[author].push(article);
+                });
             });
+            
+            // initialize css3d rendering if available
+            let useCSS3D = false;
+            if (window.css3dIntegration && !DEVELOPMENT) {
+                // use css3d renderer for production
+                useCSS3D = true;
+                window.css3dIntegration.createAuthorElements(authors, authorArticles);
+                if (window.debugLog) {
+                    window.debugLog('using css3d renderer for author elements');
+                }
+            }
+            
+            // if we're not using css3d or in development mode, create 3d meshes
+            if (!useCSS3D || DEVELOPMENT) {
+                // create text or box for each author
+                const existingPositions = [];
+                authors.forEach((author, index) => {
+                    // find a random position that isn't too close to existing items
+                    let position;
+                    let attempts = 0;
+                    const maxAttempts = 50; // prevent infinite loops
+                    
+                    do {
+                        position = generateRandomPosition();
+                        attempts++;
+                    } while (isTooClose(position, existingPositions) && attempts < maxAttempts);
+                    
+                    existingPositions.push(position);
+                    
+                    const x = position.x;
+                    const y = position.y;
+                    const z = boxSize * 2; // slightly above the background
+                    
+                    // get the article(s) for this author
+                    const articles = authorArticles[author] || [];
+                    const article = articles.length > 0 ? articles[0] : null;
+                    
+                    // create a group for this author's content
+                    const authorGroup = new THREE.Group();
+                    authorGroup.position.set(x, y, z);
+                    // add slight random rotation for visual interest
+                    authorGroup.rotation.z = Math.random() * 0.8 - 0.1;
+                    scene.add(authorGroup);
+                    
+                    // create text or box based on mode
+                    let interactiveObject; // will be either text or box mesh
 
-            // store reference to both mesh and label
-            authorObjects.push({
-            mesh,
-            label,
-            position: new THREE.Vector3(x, y, z),
-            author
+                    if (DEVELOPMENT) {
+                        // development mode: create box as in original implementation
+                        const geometry = new THREE.BoxGeometry(boxSize, boxSize, boxSize * 2);
+                        interactiveObject = new THREE.Mesh(geometry, normalMaterial.clone());
+                        interactiveObject.position.set(0, 0, 0); // relative to group
+                        authorGroup.add(interactiveObject);
+                        
+                        // add author name label below the box
+                        if (window.addLabel) {
+                            const label = window.addLabel(scene, author, 0, -boxSize/2 - 0.3, 0.05, { // relative to group
+                                fontSize: 30, // pixels for canvas texture
+                                color: COLORS.labelText, 
+                                visualHeight: 0.15, // desired visual height in world units
+                            });
+                            authorGroup.add(label);
+                        }
+                    } else {
+                        // production mode: create high-quality text for article title and author
+                        
+                        // create hitbox for raycasting (invisible but interactive)
+                        const hitboxGeometry = new THREE.PlaneGeometry(2, 1.2);
+                        const hitboxMaterial = new THREE.MeshBasicMaterial({
+                            color: COLORS.primary,
+                            transparent: true,
+                            opacity: 0.01 // nearly invisible
+                        });
+                        interactiveObject = new THREE.Mesh(hitboxGeometry, hitboxMaterial);
+                        interactiveObject.position.set(0, 0, 0);
+                        authorGroup.add(interactiveObject);
+                        
+                        if (window.debugLog) {
+                            window.debugLog(`creating text sprites for author: ${author}`);
+                        }
+                        
+                        // directly use canvas-based sprite renderer rather than loading font files
+                        // create title text (use article title if available, otherwise use author name)
+                        const titleText = article ? article.title : author;
+                        
+                        try {
+                            // create title sprite with a more distinctive background for visibility
+                            const titleCanvas = document.createElement('canvas');
+                            const titleContext = titleCanvas.getContext('2d');
+                            
+                            // set dimensions and clear
+                            const titleFontSize = 28;
+                            titleCanvas.width = 400;  // fixed width that can accommodate most titles
+                            titleCanvas.height = 60;  // enough height for the text
+                            
+                            // add semi-transparent background
+                            titleContext.fillStyle = 'rgba(0,0,0,0.5)';
+                            titleContext.fillRect(0, 0, titleCanvas.width, titleCanvas.height);
+                            
+                            // draw title text
+                            titleContext.font = `${titleFontSize}px Arial`;
+                            titleContext.textAlign = 'center';
+                            titleContext.textBaseline = 'middle';
+                            titleContext.fillStyle = 'white';
+                            titleContext.fillText(titleText, titleCanvas.width / 2, titleCanvas.height / 2);
+                            
+                            // create sprite
+                            const titleTexture = new THREE.CanvasTexture(titleCanvas);
+                            const titleMaterial = new THREE.SpriteMaterial({ 
+                                map: titleTexture,
+                                transparent: true,
+                                depthTest: false,
+                                depthWrite: false
+                            });
+                            const titleSprite = new THREE.Sprite(titleMaterial);
+                            titleSprite.position.set(0, 0.2, 0.1); // position relative to group
+                            titleSprite.scale.set(2, 0.4, 1); // wider than tall
+                            authorGroup.add(titleSprite);
+                            
+                            // create author sprite below title
+                            const authorCanvas = document.createElement('canvas');
+                            const authorContext = authorCanvas.getContext('2d');
+                            
+                            // set dimensions and clear
+                            const authorFontSize = 20;
+                            authorCanvas.width = 300;  // fixed width
+                            authorCanvas.height = 40;  // enough height for the text
+                            
+                            // add semi-transparent background
+                            authorContext.fillStyle = 'rgba(0,0,0,0.3)';
+                            authorContext.fillRect(0, 0, authorCanvas.width, authorCanvas.height);
+                            
+                            // draw author text
+                            authorContext.font = `${authorFontSize}px Arial`;
+                            authorContext.textAlign = 'center';
+                            authorContext.textBaseline = 'middle';
+                            authorContext.fillStyle = 'white';
+                            authorContext.fillText(author, authorCanvas.width / 2, authorCanvas.height / 2);
+                            
+                            // create sprite
+                            const authorTexture = new THREE.CanvasTexture(authorCanvas);
+                            const authorMaterial = new THREE.SpriteMaterial({ 
+                                map: authorTexture,
+                                transparent: true,
+                                depthTest: false,
+                                depthWrite: false
+                            });
+                            const authorSprite = new THREE.Sprite(authorMaterial);
+                            authorSprite.position.set(0, -0.1, 0.1); // position relative to group
+                            authorSprite.scale.set(1.5, 0.3, 1); // wider than tall
+                            authorGroup.add(authorSprite);
+                            
+                            if (window.debugLog) {
+                                window.debugLog(`direct canvas sprites created for ${author}`);
+                            }
+                        } catch (error) {
+                            if (window.debugLog) {
+                                window.debugLog(`error creating text sprites for ${author}:`, error);
+                            }
+                            
+                            // fallback to addLabel if available
+                            if (window.addLabel) {
+                                // create title sprite
+                                const titleLabel = window.addLabel(
+                                    authorGroup, // attach to group instead of directly to scene
+                                    titleText, 
+                                    0, 0.2, 0.1, // position relative to group
+                                    {
+                                        fontSize: 28,
+                                        color: 'white',
+                                        visualHeight: 0.25,
+                                        backgroundColor: 'rgba(0,0,0,0.5)' // more visible background
+                                    }
+                                );
+                                
+                                // create author text below title
+                                const authorLabel = window.addLabel(
+                                    authorGroup, // attach to group instead of directly to scene
+                                    author, 
+                                    0, -0.1, 0.1, // position relative to group
+                                    {
+                                        fontSize: 20,
+                                        color: 'white',
+                                        visualHeight: 0.15,
+                                        backgroundColor: 'rgba(0,0,0,0.3)' // more visible background
+                                    }
+                                );
+                            } else {
+                                window.debugLog(`addLabel function not available for ${author}`);
+                            }
+                        }
+                    }
+                    
+                    // store reference to both mesh and group
+                    authorObjects.push({
+                        mesh: interactiveObject,
+                        group: authorGroup,
+                        position: new THREE.Vector3(x, y, z),
+                        author: author,
+                        article: article
+                    });
+                });
+                
+                // setup raycasting and interactivity
+                setupInteractivity();
+            }
+        })
+        .catch(error => {
+            console.error('error loading article data:', error);
+            
+            // fallback to simple author boxes if json can't be loaded
+            setupSimpleAuthorObjects(authors);
+        });
+    
+    // setup interactivity with raycasting
+    function setupInteractivity() {
+        // add click event listener to the document
+        document.addEventListener('click', onDocumentClick);
+        
+        // add raycaster for interactivity
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        
+        // handle mouse move for hover effects
+        document.addEventListener('mousemove', (event) => {
+            // convert mouse position to normalized device coordinates
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            // update the raycaster
+            raycaster.setFromCamera(mouse, camera);
+            
+            // check for intersections
+            const intersects = raycaster.intersectObjects(authorObjects.map(obj => obj.mesh));
+            
+            // reset all materials first
+            authorObjects.forEach(obj => {
+                if (DEVELOPMENT) {
+                    obj.mesh.material.color.set(COLORS.primary);
+                } else {
+                    // in production mode, make hitbox more visible on hover reset
+                    obj.mesh.material.opacity = 0.01;
+                }
             });
-        } else {
-            // store reference to just the mesh when not in development
-            authorObjects.push({
-            mesh,
-            position: new THREE.Vector3(x, y, z),
-            author
-            });
-        }
-    });
-    
-    // add click event listener to the document
-    document.addEventListener('click', onDocumentClick);
-    
-    // add raycaster for interactivity
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-    
-    // handle mouse move for hover effects
-    document.addEventListener('mousemove', (event) => {
-        // convert mouse position to normalized device coordinates
-        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-        
-        // update the raycaster
-        raycaster.setFromCamera(mouse, camera);
-        
-        // check for intersections
-        const intersects = raycaster.intersectObjects(authorObjects.map(obj => obj.mesh));
-        
-        // reset all materials first
-        authorObjects.forEach(obj => {
-            obj.mesh.material.color.set(COLORS.primary);
+            
+            // change material color if hovering
+            if (intersects.length > 0) {
+                const hoveredObject = authorObjects.find(obj => obj.mesh === intersects[0].object);
+                
+                if (DEVELOPMENT) {
+                    intersects[0].object.material.color.set(COLORS.secondary);
+                } else {
+                    // in production mode, make hitbox slightly visible on hover
+                    intersects[0].object.material.opacity = 0.2;
+                    // subtle scale animation on hover
+                    hoveredObject.group.scale.set(1.05, 1.05, 1.05);
+                }
+                
+                document.body.style.cursor = 'pointer';
+            } else {
+                // reset scale for all objects
+                authorObjects.forEach(obj => {
+                    obj.group.scale.set(1, 1, 1);
+                });
+                
+                // set grab cursor for the panning area, but only when not dragging
+                document.body.style.cursor = isDragging ? 'grabbing' : 'grab';
+            }
         });
         
-        // change material color if hovering
-        if (intersects.length > 0) {
-            intersects[0].object.material.color.set(COLORS.secondary);
-            document.body.style.cursor = 'pointer';
-        } else {
-            // set grab cursor for the panning area, but only when not dragging
-            document.body.style.cursor = isDragging ? 'grabbing' : 'grab';
-        }
-    });
-    
-    // handle click on author boxes
-    function onDocumentClick(event) {
-        // don't process click if we were just dragging (to avoid accidental clicks)
-        if (animationParams.active || isDragging || Math.abs(event.clientX - previousMousePosition.x) > 5 || 
-            Math.abs(event.clientY - previousMousePosition.y) > 5) {
-            return;
-        }
-        
-        // convert mouse position to normalized device coordinates
-        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-        
-        // update the raycaster
-        raycaster.setFromCamera(mouse, camera);
-        
-        // check for intersections
-        const intersects = raycaster.intersectObjects(authorObjects.map(obj => obj.mesh));
-        
-        if (intersects.length > 0) {
-            // find the clicked author
-            const clickedMesh = intersects[0].object;
-            const clickedAuthor = authorObjects.find(obj => obj.mesh === clickedMesh);
+        // handle click on author objects
+        function onDocumentClick(event) {
+            // don't process click if we were just dragging (to avoid accidental clicks)
+            if (animationParams.active || isDragging || Math.abs(event.clientX - previousMousePosition.x) > 5 || 
+                Math.abs(event.clientY - previousMousePosition.y) > 5) {
+                return;
+            }
             
-            if (clickedAuthor) {
-                console.log(`Author clicked: ${clickedAuthor.author}`);
+            // convert mouse position to normalized device coordinates
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            // update the raycaster
+            raycaster.setFromCamera(mouse, camera);
+            
+            // check for intersections
+            const intersects = raycaster.intersectObjects(authorObjects.map(obj => obj.mesh));
+            
+            if (intersects.length > 0) {
+                // find the clicked author
+                const clickedMesh = intersects[0].object;
+                const clickedAuthor = authorObjects.find(obj => obj.mesh === clickedMesh);
                 
-                // switch to perspective camera and focus on the clicked mesh
-                focusOnObject(clickedMesh);
-                
-                // example: trigger a custom event that scripts.js can listen for
-                const authorClickEvent = new CustomEvent('authorClick', {
-                    detail: { author: clickedAuthor.author }
-                });
-                document.dispatchEvent(authorClickEvent);
+                if (clickedAuthor) {
+                    console.log(`author clicked: ${clickedAuthor.author}`);
+                    
+                    // switch to perspective camera and focus on the clicked group
+                    focusOnObject(clickedAuthor.group);
+                    
+                    // trigger a custom event that scripts.js can listen for
+                    const authorClickEvent = new CustomEvent('authorClick', {
+                        detail: { author: clickedAuthor.author }
+                    });
+                    document.dispatchEvent(authorClickEvent);
+                }
             }
         }
+    }
+    
+    // fallback for when json data can't be loaded
+    function setupSimpleAuthorObjects(authors) {
+        const existingPositions = [];
+        
+        authors.forEach((author, index) => {
+            // generate position
+            let position;
+            let attempts = 0;
+            
+            do {
+                position = generateRandomPosition();
+                attempts++;
+            } while (isTooClose(position, existingPositions) && attempts < 50);
+            
+            existingPositions.push(position);
+            
+            const x = position.x;
+            const y = position.y;
+            const z = boxSize * 2;
+            
+            // create a box with author name only
+            const geometry = new THREE.BoxGeometry(boxSize, boxSize, boxSize * 0.5);
+            const mesh = new THREE.Mesh(geometry, normalMaterial.clone());
+            mesh.position.set(x, y, z);
+            mesh.rotation.z = Math.random() * 0.8 - 0.1;
+            scene.add(mesh);
+            
+            // store reference
+            authorObjects.push({
+                mesh,
+                position: new THREE.Vector3(x, y, z),
+                author
+            });
+        });
+        
+        // setup simple interactivity
+        setupInteractivity();
     }
     
     // return the author objects for reference elsewhere if needed
@@ -439,8 +695,22 @@ function updateAuthorOpacity(filteredAuthors = null) {
     if (!filteredAuthors || filteredAuthors.length === 0) {
         authorObjects.forEach(obj => {
             // create a smooth transition
-            const startOpacity = obj.mesh.material.opacity;
-            const endOpacity = DEFAULT_OPACITY;
+            let startOpacity, endOpacity;
+            
+            if (DEVELOPMENT) {
+                // in development mode, change just the box opacity
+                startOpacity = obj.mesh.material.opacity;
+                endOpacity = DEFAULT_OPACITY;
+            } else if (obj.group) {
+                // in production mode, fade the entire group
+                startOpacity = obj.group.children.length > 0 ? 
+                    obj.group.children[0].material.opacity : 1;
+                endOpacity = 1;
+            } else {
+                // fallback for simple objects
+                startOpacity = obj.mesh.material.opacity;
+                endOpacity = DEFAULT_OPACITY;
+            }
             
             const startTime = Date.now();
             
@@ -449,7 +719,24 @@ function updateAuthorOpacity(filteredAuthors = null) {
                 const elapsed = Date.now() - startTime;
                 const progress = Math.min(elapsed / TRANSITION_DURATION, 1);
                 
-                obj.mesh.material.opacity = startOpacity + (endOpacity - startOpacity) * progress;
+                if (DEVELOPMENT) {
+                    // in development mode, just change the box opacity
+                    obj.mesh.material.opacity = startOpacity + (endOpacity - startOpacity) * progress;
+                } else if (obj.group) {
+                    // in production mode, fade all children in the group
+                    obj.group.children.forEach(child => {
+                        if (child.material && child.material.transparent) {
+                            const childStartOpacity = child === obj.mesh ? 0.01 : startOpacity;
+                            const childEndOpacity = child === obj.mesh ? 0.01 : endOpacity;
+                            child.material.opacity = childStartOpacity + (childEndOpacity - childStartOpacity) * progress;
+                        }
+                    });
+                    // restore group scale
+                    obj.group.scale.set(1, 1, 1);
+                } else {
+                    // fallback for simple objects
+                    obj.mesh.material.opacity = startOpacity + (endOpacity - startOpacity) * progress;
+                }
                 
                 if (progress < 1) {
                     requestAnimationFrame(animateOpacity);
@@ -477,14 +764,28 @@ function updateAuthorOpacity(filteredAuthors = null) {
         }
     });
     
-    // update opacity for each author box with smooth transition
+    // update opacity for each author object with smooth transition
     authorObjects.forEach(obj => {
         // determine target opacity
         const targetOpacity = filteredAuthorNames.includes(obj.author) ? DEFAULT_OPACITY : FADED_OPACITY;
         
         // create a smooth transition
-        const startOpacity = obj.mesh.material.opacity;
-        const endOpacity = targetOpacity;
+        let startOpacity, endOpacity;
+        
+        if (DEVELOPMENT) {
+            // in development mode, change just the box opacity
+            startOpacity = obj.mesh.material.opacity;
+            endOpacity = targetOpacity;
+        } else if (obj.group) {
+            // in production mode, fade the entire group
+            startOpacity = obj.group.children.length > 0 ? 
+                obj.group.children[0].material.opacity : 1;
+            endOpacity = targetOpacity === DEFAULT_OPACITY ? 1 : 0.3; // less extreme fading for text
+        } else {
+            // fallback for simple objects
+            startOpacity = obj.mesh.material.opacity;
+            endOpacity = targetOpacity;
+        }
         
         const startTime = Date.now();
         
@@ -493,7 +794,33 @@ function updateAuthorOpacity(filteredAuthors = null) {
             const elapsed = Date.now() - startTime;
             const progress = Math.min(elapsed / TRANSITION_DURATION, 1);
             
-            obj.mesh.material.opacity = startOpacity + (endOpacity - startOpacity) * progress;
+            if (DEVELOPMENT) {
+                // in development mode, just change the box opacity
+                obj.mesh.material.opacity = startOpacity + (endOpacity - startOpacity) * progress;
+            } else if (obj.group) {
+                // in production mode, fade all children in the group
+                obj.group.children.forEach(child => {
+                    if (child.material && child.material.transparent) {
+                        const childStartOpacity = child === obj.mesh ? 0.01 : startOpacity;
+                        const childEndOpacity = child === obj.mesh ? 0.01 : endOpacity;
+                        child.material.opacity = childStartOpacity + (childEndOpacity - childStartOpacity) * progress;
+                    }
+                });
+                
+                // scale down non-matching items for additional visual clarity
+                if (targetOpacity === FADED_OPACITY) {
+                    const startScale = 1;
+                    const endScale = 0.9;
+                    const scale = startScale + (endScale - startScale) * progress;
+                    obj.group.scale.set(scale, scale, scale);
+                } else {
+                    // restore scale for matching items
+                    obj.group.scale.set(1, 1, 1);
+                }
+            } else {
+                // fallback for simple objects
+                obj.mesh.material.opacity = startOpacity + (endOpacity - startOpacity) * progress;
+            }
             
             if (progress < 1) {
                 requestAnimationFrame(animateOpacity);
@@ -763,11 +1090,16 @@ function onMouseWheel(event) {
         }
     }
     
-    // allow scrolling if the mouse is over an article-text element
-    if (event.target.closest && event.target.closest('.article-text')) {
-        // do not prevent default, let the browser scroll the text
-        return;
+    // check if the mouse is over any of the scrollable elements
+    if (event.target.closest) {
+        for (const selector of scrollableElementSelectors) {
+            if (event.target.closest(selector)) {
+                // do not prevent default, let the browser scroll the text
+                return;
+            }
+        }
     }
+    
     // prevent default scrolling
     event.preventDefault();
 
@@ -803,8 +1135,8 @@ function onMouseWheel(event) {
         const lookAtPoint = new THREE.Vector3(targetX, targetY, 0);
         let currentDistance = camera.position.distanceTo(lookAtPoint);
 
-        const minZoomDist = 1.5; // minimum distance to the look-at point
-        const maxZoomDist = 30;  // maximum distance from the look-at point
+        const minZoomDist = 0.5; // minimum distance to the look-at point
+        const maxZoomDist = 60;  // maximum distance from the look-at point
 
         // if camera is at (or extremely close to) the lookatpoint
         if (currentDistance < 0.01) {
@@ -947,6 +1279,11 @@ function animate() {
 
     // render scene
     renderer.render(scene, camera);
+    
+    // render css3d elements if available
+    if (window.css3dIntegration && window.css3dIntegration.updateCSS3DRenderer) {
+        window.css3dIntegration.updateCSS3DRenderer(camera);
+    }
 
     // draw development visuals if enabled
     if (DEVELOPMENT) {
@@ -967,7 +1304,43 @@ function animate() {
     }
 }
 
+// This function allows debugging the Three.js renderer
+function debugRenderer() {
+    if (!window.threeScene || !renderer) {
+        console.warn('three.js scene or renderer not initialized');
+        return;
+    }
+    
+    // log some renderer info
+    debugLog('renderer info:', {
+        width: renderer.domElement.width,
+        height: renderer.domElement.height,
+        pixelRatio: window.devicePixelRatio,
+        autoClear: renderer.autoClear,
+        sceneObjects: window.threeScene.children.length
+    });
+    
+    // force render - sometimes helps with display issues
+    renderer.render(window.threeScene, camera);
+}
+
 // expose functions to global scope
 window.initThreeJS = initThreeJS;
 window.createAuthorMeshes = createAuthorMeshes;
 window.centerCamera = centerCamera;
+window.scene = scene; // Make scene available globally
+window.debugRenderer = debugRenderer;
+
+// function to update the list of scrollable elements
+function updateScrollableElements(selectors) {
+    if (Array.isArray(selectors)) {
+        scrollableElementSelectors = selectors;
+    } else if (typeof selectors === 'string') {
+        scrollableElementSelectors = [selectors];
+    }
+    // log for debugging
+    console.log("scrollable elements updated:", scrollableElementSelectors);
+}
+
+// expose scrollable elements function globally
+window.updateScrollableElements = updateScrollableElements;

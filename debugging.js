@@ -1,6 +1,14 @@
 // set to true to show the work in progress overlay
 const SHOW_WIP_OVERLAY = false;
 
+// debug logging function
+function debugLog(message, data) {
+    if (window.DEVELOPMENT) {
+        const timestamp = new Date().toISOString().slice(11, 23);
+        console.log(`[debug ${timestamp}] ${message}`, data || '');
+    }
+}
+
 // initialize trigger areas visualization if in development mode
 function initTriggerAreas(development) {
     if (development) {
@@ -488,22 +496,32 @@ function createPanningDebugControls() {
 // function to add text label as a sprite in the 3d scene
 // uses three.js sprites
 function addLabel(scene, text, x, y, z, options = {}) {
+    // debug logging
+    debugLog(`creating label: "${text}" at position (${x}, ${y}, ${z})`);
+    
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
     
+    // use default values if not provided
     const fontSize = options.fontSize || 24; // default font size
     const fontFace = options.fontFace || 'Arial';
     const textColorHex = options.color || '#000000'; // default black
     const backgroundColorRgba = options.backgroundColor || 'rgba(0,0,0,0)'; // default transparent background
 
+    debugLog(`label settings: fontSize=${fontSize}, fontFace=${fontFace}, color=${textColorHex}, background=${backgroundColorRgba}`);
+
+    // set font before measuring
     context.font = `${fontSize}px ${fontFace}`;
     const textMetrics = context.measureText(text);
+    
     // add some padding to the canvas width and height
     const padding = fontSize * 0.5;
-    canvas.width = textMetrics.width + padding;
-    canvas.height = fontSize + padding; 
+    canvas.width = Math.max(textMetrics.width + padding * 2, 20); // ensure minimum width
+    canvas.height = Math.max(fontSize + padding * 2, 20); // ensure minimum height
 
-    // re-apply font after canvas resize
+    debugLog(`canvas dimensions: ${canvas.width}x${canvas.height}`);
+
+    // re-apply font after canvas resize (this is crucial!)
     context.font = `${fontSize}px ${fontFace}`;
 
     // background
@@ -516,23 +534,33 @@ function addLabel(scene, text, x, y, z, options = {}) {
     context.textBaseline = 'middle';
     context.fillText(text, canvas.width / 2, canvas.height / 2);
 
+    // create texture and ensure it updates
     const texture = new THREE.CanvasTexture(canvas);
     texture.needsUpdate = true; // ensure the texture updates
 
-    const material = new THREE.SpriteMaterial({ map: texture });
+    // create sprite material with proper settings
+    const material = new THREE.SpriteMaterial({ 
+        map: texture,
+        transparent: true,
+        depthTest: false, // ensure text is visible over other objects
+        depthWrite: false // ensure text doesn't affect depth buffer
+    });
+    
     const sprite = new THREE.Sprite(material);
-
     sprite.position.set(x, y, z);
 
-    // scale the sprite.
-    // a sprite is 1x1 by default in world units if its map is square.
-    // we want the sprite's apparent height to be somewhat consistent.
-    // the scale factors in options (scalex, scaley) are multipliers.
+    // scale the sprite
+    // a sprite is 1x1 by default in world units if its map is square
+    // we want the sprite's apparent height to be somewhat consistent
+    // the scale factors in options (scalex, scaley) are multipliers
     const desiredVisualHeight = options.visualHeight || 0.3; // desired height of the text in world units
     
     sprite.scale.x = (canvas.width / canvas.height) * desiredVisualHeight * (options.scaleX || 1);
     sprite.scale.y = desiredVisualHeight * (options.scaleY || 1);
     
+    debugLog(`sprite scale: (${sprite.scale.x}, ${sprite.scale.y})`);
+    
+    // add to scene and return the sprite
     scene.add(sprite);
     return sprite;
 }
@@ -586,3 +614,4 @@ window.removePanBoundaryVisualizer = removePanBoundaryVisualizer;
 window.createPanningDebugControls = createPanningDebugControls;
 window.addLabel = addLabel;
 window.showWipOverlay = showWipOverlay;
+window.debugLog = debugLog;
